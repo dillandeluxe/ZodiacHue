@@ -48,6 +48,7 @@ import com.android.zodiachue.helper.CompatibilityEngine
 import com.android.zodiachue.helper.DailyHueEngine
 import com.android.zodiachue.helper.ZodiacProvider
 import com.android.zodiachue.ui.components.SignDetailSheet
+import com.android.zodiachue.ui.components.ZodiacGlyph
 import com.android.zodiachue.ui.state.ZodiacHueAppState
 import com.android.zodiachue.ui.theme.CosmicBackdrop
 import com.android.zodiachue.ui.theme.CosmicCard
@@ -202,10 +203,23 @@ fun ExploreScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text(text = data.emoji, fontSize = 26.sp)
                                     Box(
                                         modifier = Modifier
-                                            .size(18.dp)
+                                            .size(38.dp)
+                                            .clip(CircleShape)
+                                            .background(dotColor.copy(alpha = 0.14f))
+                                            .border(1.dp, dotColor.copy(alpha = 0.4f), CircleShape),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        ZodiacGlyph(
+                                            sign = data.sign,
+                                            color = dotColor,
+                                            size = 19.dp
+                                        )
+                                    }
+                                    Box(
+                                        modifier = Modifier
+                                            .size(16.dp)
                                             .clip(CircleShape)
                                             .background(dotColor)
                                             .border(1.dp, Color.White.copy(alpha = 0.6f), CircleShape)
@@ -386,8 +400,13 @@ private fun SignSelectorRow(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = data.emoji, fontSize = 15.sp)
-                    Spacer(modifier = Modifier.width(5.dp))
+                    ZodiacGlyph(
+                        sign = data.sign,
+                        color = if (selected) CosmicColors.PrimaryBright else CosmicColors.TextSecondary,
+                        size = 14.dp,
+                        strokeWidthDp = 1.5.dp
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = data.sign,
                         color = if (selected) CosmicColors.TextPrimary else CosmicColors.TextSecondary,

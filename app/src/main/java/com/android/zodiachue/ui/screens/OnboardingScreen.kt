@@ -56,6 +56,7 @@ import com.android.zodiachue.helper.ZodiacCalculator
 import com.android.zodiachue.helper.ZodiacProvider
 import com.android.zodiachue.ui.components.AuthModalSheet
 import com.android.zodiachue.ui.components.CosmicDatePickerDialog
+import com.android.zodiachue.ui.components.ZodiacGlyph
 import com.android.zodiachue.ui.components.cosmicTextFieldColors
 import com.android.zodiachue.ui.state.ZodiacHueAppState
 import com.android.zodiachue.ui.theme.CosmicBackdrop
@@ -229,11 +230,15 @@ fun OnboardingScreen(
                                 )
                             ) {
                                 Column(
-                                    modifier = Modifier.padding(vertical = 7.dp, horizontal = 4.dp),
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
-                                    Text(text = signData.emoji, fontSize = 18.sp)
-                                    Spacer(modifier = Modifier.height(2.dp))
+                                    ZodiacGlyph(
+                                        sign = signData.sign,
+                                        color = if (isSelected) dotColor else CosmicColors.TextPrimary,
+                                        size = 20.dp
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     Text(
                                         text = signData.sign,
                                         color = CosmicColors.TextPrimary,

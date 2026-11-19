@@ -374,7 +374,7 @@ fun ProfileScreen(
                                 modifier = Modifier.weight(1f)
                             )
                             StatColumn(
-                                primary = "${zodiac.emoji} ${zodiac.sign}",
+                                primary = zodiac.sign,
                                 secondary = "Sign",
                                 modifier = Modifier.weight(1f)
                             )

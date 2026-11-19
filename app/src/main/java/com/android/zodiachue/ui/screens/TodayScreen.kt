@@ -57,7 +57,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.android.zodiachue.helper.ZodiacProvider
+import com.android.zodiachue.ui.components.CelestialSpecPill
 import com.android.zodiachue.ui.components.SignPickerSheet
+import com.android.zodiachue.ui.components.ZodiacGlyph
 import com.android.zodiachue.ui.state.ZodiacHueAppState
 import com.android.zodiachue.ui.theme.ColorSwatchChip
 import com.android.zodiachue.ui.theme.CosmicBackdrop
@@ -75,6 +78,7 @@ fun TodayScreen(
     onShowMessage: (String) -> Unit
 ) {
     val hue = appState.activeDailyHue
+    val zodiac = remember(hue.sign) { ZodiacProvider.getZodiacDataForSign(hue.sign) }
     val forecast = appState.sevenDayForecast
     val animatedHueColor by animateColorAsState(
         targetValue = parseComposeColor(hue.primaryColorHex),
@@ -122,16 +126,18 @@ fun TodayScreen(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = hue.dateLabel,
-                        color = CosmicColors.TextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium
+                        text = hue.dateLabel.uppercase(),
+                        color = CosmicColors.TextMuted,
+                        fontSize = 11.sp,
+                        letterSpacing = 1.1.sp,
+                        fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "${timeOfDayGreeting()}, ${appState.currentUser?.firstName ?: "Stargazer"}",
                         color = CosmicColors.TextPrimary,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
+                        fontSize = 23.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 2.dp)
                     )
                 }
 
@@ -140,24 +146,31 @@ fun TodayScreen(
                         .clip(RoundedCornerShape(999.dp))
                         .clickable { showSignPicker = true },
                     shape = RoundedCornerShape(999.dp),
-                    color = CosmicColors.SurfaceSolid,
+                    color = CosmicColors.Surface,
                     border = BorderStroke(1.dp, CosmicColors.Outline)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        ZodiacGlyph(
+                            sign = hue.sign,
+                            color = animatedHueColor,
+                            size = 16.dp,
+                            strokeWidthDp = 1.6.dp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "${hue.emoji} ${hue.sign}",
+                            text = hue.sign,
                             color = CosmicColors.TextPrimary,
                             fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Icon(
                             Icons.Rounded.ExpandMore,
                             contentDescription = "Switch sign",
-                            tint = CosmicColors.PrimaryBright,
+                            tint = CosmicColors.TextSecondary,
                             modifier = Modifier.size(16.dp)
                         )
                     }
@@ -168,14 +181,14 @@ fun TodayScreen(
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .clickable { appState.resetToOwnSign() },
-                    shape = RoundedCornerShape(12.dp),
-                    color = CosmicColors.Primary.copy(alpha = 0.16f),
-                    border = BorderStroke(1.dp, CosmicColors.Outline)
+                    shape = RoundedCornerShape(14.dp),
+                    color = CosmicColors.Primary.copy(alpha = 0.14f),
+                    border = BorderStroke(1.dp, CosmicColors.Primary.copy(alpha = 0.35f))
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
@@ -210,7 +223,7 @@ fun TodayScreen(
                         shape = RoundedCornerShape(14.dp),
                         color = if (isSelected) CosmicColors.SurfaceElevated else CosmicColors.Surface,
                         border = BorderStroke(
-                            width = if (isSelected) 1.5.dp else 1.dp,
+                            width = if (isSelected) 1.4.dp else 1.dp,
                             color = if (isSelected) dotColor else CosmicColors.Outline
                         )
                     ) {
@@ -220,11 +233,11 @@ fun TodayScreen(
                         ) {
                             Box(
                                 modifier = Modifier
-                                    .size(10.dp)
+                                    .size(9.dp)
                                     .clip(CircleShape)
                                     .background(dotColor)
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(7.dp))
                             Text(
                                 text = dayItem.shortDayLabel,
                                 color = if (isSelected) CosmicColors.TextPrimary else CosmicColors.TextSecondary,
@@ -236,63 +249,90 @@ fun TodayScreen(
                 }
             }
 
-            // Hero Daily Hue Card
+            // Hero Daily Hue Aura Card
             Surface(
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(26.dp),
                 color = CosmicColors.Surface,
-                border = BorderStroke(1.dp, animatedHueColor.copy(alpha = 0.55f))
+                border = BorderStroke(
+                    1.dp,
+                    Brush.verticalGradient(
+                        listOf(animatedHueColor.copy(alpha = 0.65f), Color.White.copy(alpha = 0.06f))
+                    )
+                )
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(
-                            Brush.horizontalGradient(
+                            Brush.radialGradient(
                                 colors = listOf(
-                                    animatedHueColor.copy(alpha = 0.22f),
+                                    animatedHueColor.copy(alpha = 0.25f),
                                     Color.Transparent
-                                )
+                                ),
+                                radius = 720f
                             )
                         )
-                        .padding(18.dp)
+                        .padding(20.dp)
                 ) {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Orbital Color Orb
                             Box(
-                                modifier = Modifier
-                                    .size(68.dp)
-                                    .clip(CircleShape)
-                                    .background(animatedHueColor)
-                                    .border(2.5.dp, Color.White.copy(alpha = 0.75f), CircleShape)
-                            )
+                                modifier = Modifier.size(84.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(84.dp)
+                                        .clip(CircleShape)
+                                        .border(1.dp, animatedHueColor.copy(alpha = 0.30f), CircleShape)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(72.dp)
+                                        .clip(CircleShape)
+                                        .border(1.dp, animatedHueColor.copy(alpha = 0.50f), CircleShape)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .size(60.dp)
+                                        .clip(CircleShape)
+                                        .background(animatedHueColor)
+                                        .border(2.dp, Color.White.copy(alpha = 0.8f), CircleShape)
+                                )
+                            }
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = if (hue.dayOffset == 0) "COLOR OF THE DAY" else "FORECAST HUE",
                                     color = CosmicColors.TextMuted,
-                                    fontSize = 11.sp,
+                                    fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
-                                    letterSpacing = 0.8.sp
+                                    letterSpacing = 1.2.sp
                                 )
                                 Text(
                                     text = hue.primaryColorName,
                                     color = CosmicColors.TextPrimary,
-                                    fontSize = 23.sp,
-                                    fontWeight = FontWeight.Bold
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(top = 2.dp)
                                 )
                                 Text(
                                     text = "${hue.sign} • ${hue.element} • ${hue.dateRange}",
                                     color = CosmicColors.TextSecondary,
-                                    fontSize = 12.sp
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(14.dp))
                         Text(
                             text = hue.tagline,
                             color = CosmicColors.TextPrimary,
                             fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
+                            fontWeight = FontWeight.Medium,
+                            lineHeight = 20.sp
                         )
 
                         Spacer(modifier = Modifier.height(14.dp))
@@ -306,13 +346,13 @@ fun TodayScreen(
                                 border = BorderStroke(1.dp, CosmicColors.Outline)
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
                                         Icons.Rounded.ContentCopy,
                                         contentDescription = "Copy Hex",
-                                        tint = CosmicColors.PrimaryBright,
+                                        tint = animatedHueColor,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
@@ -335,11 +375,11 @@ fun TodayScreen(
                                         )
                                     },
                                 shape = RoundedCornerShape(999.dp),
-                                color = CosmicColors.Primary.copy(alpha = 0.22f),
-                                border = BorderStroke(1.dp, CosmicColors.Primary.copy(alpha = 0.5f))
+                                color = animatedHueColor.copy(alpha = 0.20f),
+                                border = BorderStroke(1.dp, animatedHueColor.copy(alpha = 0.55f))
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Icon(
@@ -429,7 +469,7 @@ fun TodayScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                            .padding(horizontal = 12.dp, vertical = 9.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
@@ -447,6 +487,54 @@ fun TodayScreen(
                         )
                     }
                 }
+            }
+
+            // Native Dark-Glass Celestial Profile Card (replaces dated bright Canva PNGs)
+            CosmicCard(borderColor = animatedHueColor.copy(alpha = 0.35f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(animatedHueColor.copy(alpha = 0.14f))
+                            .border(1.dp, animatedHueColor.copy(alpha = 0.45f), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        ZodiacGlyph(sign = zodiac.sign, color = animatedHueColor, size = 24.dp)
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "${zodiac.sign} Celestial Profile",
+                            color = CosmicColors.TextPrimary,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = zodiac.dateRange,
+                            color = CosmicColors.TextMuted,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CelestialSpecPill("Element", zodiac.element, Modifier.weight(1f))
+                    CelestialSpecPill("Planet", zodiac.rulingPlanet, Modifier.weight(1f))
+                    CelestialSpecPill("Symbol", zodiac.symbolName, Modifier.weight(1f))
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = zodiac.traitSummary,
+                    color = CosmicColors.TextSecondary,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp
+                )
             }
 
             // Reading & Style Guidance
@@ -477,11 +565,11 @@ fun TodayScreen(
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
-                GuideRow(label = "✨ Mood Influence", body = hue.moodInfluence)
+                GuideRow(label = "Mood Influence", body = hue.moodInfluence)
                 Spacer(modifier = Modifier.height(8.dp))
-                GuideRow(label = "🎨 What to Wear", body = hue.aestheticToWear)
+                GuideRow(label = "What to Wear", body = hue.aestheticToWear)
                 Spacer(modifier = Modifier.height(8.dp))
-                GuideRow(label = "🚫 What to Avoid", body = hue.avoid)
+                GuideRow(label = "What to Avoid", body = hue.avoid)
 
                 Spacer(modifier = Modifier.height(14.dp))
                 OutlinedButton(
@@ -491,43 +579,29 @@ fun TodayScreen(
                             "Prompt: ${hue.journalPrompt}\n\n"
                         )
                     },
-                    border = BorderStroke(1.dp, CosmicColors.Primary),
+                    border = BorderStroke(1.dp, CosmicColors.Outline),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = CosmicColors.TextPrimary),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "Answer Today’s Prompt: \"${hue.journalPrompt}\"",
+                        text = "Reflect: \"${hue.journalPrompt}\"",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(vertical = 2.dp)
+                        modifier = Modifier.padding(vertical = 3.dp)
                     )
                 }
             }
 
-            // Infographic Showcase
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = CosmicColors.SurfaceSolid,
-                border = BorderStroke(1.dp, CosmicColors.Outline)
-            ) {
-                Image(
-                    painter = painterResource(id = hue.mainImageRes),
-                    contentDescription = "${hue.sign} Card",
-                    contentScale = ContentScale.FillWidth,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-
-            // Curated Outfit Aesthetics
+            // Curated Outfit Lookbook
             Text(
-                text = "Outfit Inspiration",
+                text = "Outfit Lookbook",
                 color = CosmicColors.TextPrimary,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = "Tap to view full look or bookmark to your moodboard",
+                text = "Tap any look to preview fullscreen or save to your moodboard",
                 color = CosmicColors.TextSecondary,
                 fontSize = 12.sp
             )
@@ -536,57 +610,81 @@ fun TodayScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                hue.galleryImages.forEach { resId ->
+                hue.galleryImages.forEachIndexed { idx, resId ->
                     val isSaved = appState.savedOutfits.contains(resId)
                     Surface(
                         modifier = Modifier
                             .weight(1f)
-                            .height(250.dp)
-                            .clip(RoundedCornerShape(18.dp))
+                            .height(256.dp)
+                            .clip(RoundedCornerShape(22.dp))
                             .clickable { previewDrawable = resId },
-                        shape = RoundedCornerShape(18.dp),
+                        shape = RoundedCornerShape(22.dp),
                         color = CosmicColors.SurfaceSolid,
                         border = BorderStroke(1.dp, CosmicColors.Outline)
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
                             Image(
                                 painter = painterResource(id = resId),
-                                contentDescription = "Outfit Look",
+                                contentDescription = "Outfit Look ${idx + 1}",
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )
-                            Surface(
+                            Box(
                                 modifier = Modifier
-                                    .align(Alignment.TopEnd)
-                                    .padding(10.dp)
-                                    .clip(RoundedCornerShape(999.dp))
-                                    .clickable {
-                                        val nowSaved = appState.toggleSavedOutfit(resId)
-                                        onShowMessage(
-                                            if (nowSaved) "Saved to moodboard!" else "Removed from moodboard"
+                                    .fillMaxWidth()
+                                    .height(74.dp)
+                                    .align(Alignment.BottomCenter)
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f))
                                         )
-                                    },
-                                shape = RoundedCornerShape(999.dp),
-                                color = CosmicColors.DeepNav.copy(alpha = 0.88f),
-                                border = BorderStroke(1.dp, CosmicColors.Outline)
+                                    )
+                            )
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .align(Alignment.BottomCenter)
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                Text(
+                                    text = "Look 0${idx + 1}",
+                                    color = Color.White,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Surface(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(999.dp))
+                                        .clickable {
+                                            val nowSaved = appState.toggleSavedOutfit(resId)
+                                            onShowMessage(
+                                                if (nowSaved) "Saved to moodboard!" else "Removed from moodboard"
+                                            )
+                                        },
+                                    shape = RoundedCornerShape(999.dp),
+                                    color = Color.White.copy(alpha = if (isSaved) 0.25f else 0.14f),
+                                    border = BorderStroke(1.dp, Color.White.copy(alpha = 0.30f))
                                 ) {
-                                    Icon(
-                                        imageVector = if (isSaved) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
-                                        contentDescription = "Save outfit",
-                                        tint = if (isSaved) CosmicColors.PrimaryBright else Color.White,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = if (isSaved) "Saved" else "Save",
-                                        color = Color.White,
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold
-                                    )
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = if (isSaved) Icons.Rounded.Bookmark else Icons.Rounded.BookmarkBorder,
+                                            contentDescription = "Save outfit",
+                                            tint = if (isSaved) animatedHueColor else Color.White,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text(
+                                            text = if (isSaved) "Saved" else "Save",
+                                            color = Color.White,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -647,9 +745,10 @@ private fun VibeMeterRow(
 private fun GuideRow(label: String, body: String) {
     Column {
         Text(
-            text = label,
-            color = CosmicColors.TextPrimary,
-            fontSize = 13.sp,
+            text = label.uppercase(),
+            color = CosmicColors.TextMuted,
+            fontSize = 10.sp,
+            letterSpacing = 0.8.sp,
             fontWeight = FontWeight.Bold
         )
         Text(

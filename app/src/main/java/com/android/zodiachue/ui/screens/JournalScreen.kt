@@ -67,6 +67,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.android.zodiachue.data.DiaryEntry
 import com.android.zodiachue.helper.ZodiacQuoteProvider
+import com.android.zodiachue.ui.components.ZodiacGlyph
 import com.android.zodiachue.ui.components.cosmicTextFieldColors
 import com.android.zodiachue.ui.state.ZodiacHueAppState
 import com.android.zodiachue.ui.theme.CosmicBackdrop
@@ -254,8 +255,20 @@ fun JournalScreen(
                 item {
                     CosmicCard {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = quote.emoji, fontSize = 22.sp)
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(parseComposeColor(hue.primaryColorHex).copy(alpha = 0.16f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                ZodiacGlyph(
+                                    sign = appState.userSign,
+                                    color = parseComposeColor(hue.primaryColorHex),
+                                    size = 17.dp
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
                             Text(
                                 text = "${appState.userSign} Daily Prompt",
                                 color = CosmicColors.TextPrimary,

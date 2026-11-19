@@ -222,12 +222,25 @@ fun SignPickerSheet(
                             color = if (isSelected) CosmicColors.Primary else CosmicColors.Outline
                         )
                     ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(text = data.emoji, fontSize = 24.sp)
-                            Spacer(modifier = Modifier.width(12.dp))
+                            Row(
+                                modifier = Modifier.padding(14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .clip(CircleShape)
+                                        .background(swatchColor.copy(alpha = 0.16f))
+                                        .border(1.dp, swatchColor.copy(alpha = 0.45f), CircleShape),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    ZodiacGlyph(
+                                        sign = data.sign,
+                                        color = swatchColor,
+                                        size = 20.dp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
@@ -286,6 +299,7 @@ fun SignDetailSheet(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val snapshot = remember(sign) { DailyHueEngine.getDailyHue(sign) }
     val zodiac = remember(sign) { ZodiacProvider.getZodiacDataForSign(sign) }
+    val signColor = parseComposeColor(snapshot.primaryColorHex)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -300,7 +314,16 @@ fun SignDetailSheet(
                 .padding(bottom = 28.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(text = zodiac.emoji, fontSize = 30.sp)
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(signColor.copy(alpha = 0.16f))
+                        .border(1.dp, signColor.copy(alpha = 0.5f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    ZodiacGlyph(sign = zodiac.sign, color = signColor, size = 24.dp)
+                }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -310,7 +333,7 @@ fun SignDetailSheet(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "${zodiac.dateRange} • ${zodiac.element} Sign",
+                        text = "${zodiac.dateRange} • ${zodiac.element} • ${zodiac.rulingPlanet}",
                         color = CosmicColors.TextSecondary,
                         fontSize = 13.sp
                     )
@@ -319,16 +342,21 @@ fun SignDetailSheet(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            Surface(
-                shape = RoundedCornerShape(18.dp),
-                color = CosmicColors.InputBg,
-                border = BorderStroke(1.dp, CosmicColors.Outline)
-            ) {
-                Image(
-                    painter = painterResource(id = zodiac.mainImageRes),
-                    contentDescription = zodiac.sign,
-                    contentScale = ContentScale.FillWidth,
-                    modifier = Modifier.fillMaxWidth()
+            CosmicCard(containerColor = CosmicColors.InputBg) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CelestialSpecPill("Element", zodiac.element, Modifier.weight(1f))
+                    CelestialSpecPill("Planet", zodiac.rulingPlanet, Modifier.weight(1f))
+                    CelestialSpecPill("Symbol", zodiac.symbolName, Modifier.weight(1f))
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = zodiac.traitSummary,
+                    color = CosmicColors.TextSecondary,
+                    fontSize = 13.sp,
+                    lineHeight = 19.sp
                 )
             }
 
@@ -536,7 +564,7 @@ fun AuthModalSheet(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                text = "${zodiac.emoji} ${zodiac.sign} • Tap to change",
+                                text = "${zodiac.sign} • Tap to change",
                                 color = CosmicColors.TextSecondary,
                                 fontSize = 12.sp
                             )
@@ -803,7 +831,7 @@ fun EditProfileSheet(
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            text = "${zodiac.emoji} ${zodiac.sign} • Tap to change",
+                            text = "${zodiac.sign} • Tap to change",
                             color = CosmicColors.TextSecondary,
                             fontSize = 12.sp
                         )
@@ -1014,6 +1042,41 @@ fun AboutDevelopersSheet(onDismiss: () -> Unit) {
                     lineHeight = 19.sp
                 )
             }
+        }
+    }
+}
+
+@Composable
+fun CelestialSpecPill(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(12.dp),
+        color = CosmicColors.SurfaceSolid,
+        border = BorderStroke(1.dp, CosmicColors.Outline)
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                text = label.uppercase(),
+                color = CosmicColors.TextMuted,
+                fontSize = 9.5.sp,
+                letterSpacing = 0.7.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = value,
+                color = CosmicColors.TextPrimary,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1,
+                modifier = Modifier.padding(top = 2.dp)
+            )
         }
     }
 }
