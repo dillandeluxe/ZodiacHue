@@ -3,8 +3,8 @@ package com.android.zodiachue.data
 data class UserData(
     var firstName: String,
     var lastName: String,
-    val birthDate: String,
-    val zodiacSign: String,
+    var birthDate: String,
+    var zodiacSign: String,
     val username: String,
-    val password: String
+    var password: String
 )

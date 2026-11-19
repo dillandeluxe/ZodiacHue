@@ -1,206 +1,161 @@
 package com.android.zodiachue
 
-import android.app.Activity
-import android.app.AlertDialog
-import android.content.Context
+import android.annotation.SuppressLint
 import android.content.Intent
-import android.graphics.Color
 import android.os.Bundle
-import android.widget.Button
-import android.widget.ImageButton
-import android.widget.LinearLayout
-import android.widget.ListView
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.View
+import android.widget.EditText
 import android.widget.TextView
 import android.widget.Toast
-import com.android.zodiachue.helper.DiaryListAdapter
-import com.android.zodiachue.helper.UserSession
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.android.zodiachue.data.DiaryEntry
+import com.android.zodiachue.helper.BottomNavHelper
+import com.android.zodiachue.helper.DiaryAdapter
+import com.android.zodiachue.helper.DiaryRepository
+import com.android.zodiachue.helper.UserRepository
 import com.android.zodiachue.helper.ZodiacQuoteProvider
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 
-class DiaryListActivity : Activity() {
-    private lateinit var listView: ListView
-    private lateinit var adapter: DiaryListAdapter
-    private lateinit var diaryEntries: MutableList<String>
-    private lateinit var entryKeys: MutableList<String>
-    private lateinit var quoteContainer: LinearLayout
-    private lateinit var txtEmoji: TextView
-    private lateinit var txtSign: TextView
-    private lateinit var txtQuote: TextView
-    private lateinit var txtAuthor: TextView
+class DiaryListActivity : AppCompatActivity() {
+    private lateinit var userRepository: UserRepository
+    private lateinit var diaryRepository: DiaryRepository
+    private lateinit var adapter: DiaryAdapter
+    private lateinit var recyclerView: RecyclerView
+    private lateinit var emptyStateLayout: View
+    private lateinit var emptyTitleText: TextView
+    private lateinit var emptySubtitleText: TextView
+    private lateinit var countBadgeText: TextView
+    private lateinit var searchEditText: EditText
+
+    private var currentUsername: String = ""
+    private var currentSign: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_diary_list)
 
-        initializeViews()
-        setupNavigationButtons()
-        setupDiaryList()
+        userRepository = UserRepository(this)
+        val user = userRepository.getCurrentUser()
+        if (user == null) {
+            startActivity(Intent(this, LoginPageActivity::class.java))
+            finish()
+            return
+        }
+
+        currentUsername = user.username
+        currentSign = user.zodiacSign
+        diaryRepository = DiaryRepository(this)
+
+        BottomNavHelper.setup(this, BottomNavHelper.Tab.DIARY)
+        initViews()
         showZodiacQuote()
-    }
-
-    private fun initializeViews() {
-        quoteContainer = findViewById(R.id.quoteContainer)
-        txtEmoji = findViewById(R.id.txtZodiacEmoji)
-        txtSign = findViewById(R.id.txtZodiacSign)
-        txtQuote = findViewById(R.id.txtZodiacQuote)
-        txtAuthor = findViewById(R.id.txtQuoteAuthor)
-
-        findViewById<Button>(R.id.btn_add_note).setOnClickListener {
-            startActivity(Intent(this, DiaryPageActivity::class.java))
-            @Suppress("DEPRECATION")
-            overridePendingTransition(0, 0)
-        }
-    }
-
-    private fun setupDiaryList() {
-        listView = findViewById(R.id.diary_list_view)
-        diaryEntries = mutableListOf()
-        entryKeys = mutableListOf()
-
-        adapter = DiaryListAdapter(
-            this,
-            diaryEntries,
-            entryKeys,
-            onItemClick = { position -> handleItemClick(position) },
-            onItemLongClick = { position -> handleItemLongClick(position) }
-        )
-
-        listView.adapter = adapter
-    }
-
-    private fun handleItemClick(position: Int) {
-        val currentUserId = UserSession.userData?.username ?: return
-        val index = entryKeys[position].toInt()
-        val sharedPreferences = getSharedPreferences("DiaryPrefs", Context.MODE_PRIVATE)
-
-        val title = sharedPreferences.getString("${currentUserId}_note_title_$index", "")
-        val content = sharedPreferences.getString("${currentUserId}_note_content_$index", "")
-
-        val intent = Intent(this, DiaryPageActivity::class.java).apply {
-            putExtra("EDIT_MODE", true)
-            putExtra("title", title)
-            putExtra("content", content)
-            putExtra("key", index.toString())
-        }
-        startActivity(intent)
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
-    }
-
-    private fun handleItemLongClick(position: Int): Boolean {
-        val currentUserId = UserSession.userData?.username ?: return false
-        val indexToDelete = entryKeys[position].toInt()
-
-        val alertDialog = AlertDialog.Builder(this, R.style.CustomAlertDialog)
-            .setTitle("Delete Entry")
-            .setMessage("Are you sure you want to delete this entry?")
-            .setCancelable(true)
-            .setPositiveButton("Delete") { _, _ -> deleteEntry(currentUserId, indexToDelete) }
-            .setNegativeButton("Cancel", null)
-            .show()
-
-        styleAlertDialogButtons(alertDialog)
-        return true
-    }
-
-    private fun deleteEntry(userId: String, indexToDelete: Int) {
-        val sharedPreferences = getSharedPreferences("DiaryPrefs", Context.MODE_PRIVATE)
-        val editor = sharedPreferences.edit()
-
-        editor.putBoolean("${userId}_note_deleted_$indexToDelete", true)
-
-        val currentCount = sharedPreferences.getInt("${userId}_noteCount", 0)
-        editor.putInt("${userId}_noteCount", currentCount - 1)
-
-        editor.apply()
-
-        loadNotes()
-        Toast.makeText(this, "Entry deleted", Toast.LENGTH_SHORT).show()
-
-        sendBroadcast(Intent("NOTE_COUNT_UPDATED"))
-    }
-
-    private fun styleAlertDialogButtons(alertDialog: AlertDialog) {
-        val positiveButton = alertDialog.getButton(AlertDialog.BUTTON_POSITIVE)
-        positiveButton.setTextColor(Color.parseColor("#4a6df7"))
-
-        val negativeButton = alertDialog.getButton(AlertDialog.BUTTON_NEGATIVE)
-        negativeButton.setTextColor(Color.parseColor("#4a6df7"))
-    }
-
-    private fun setupNavigationButtons() {
-        val btnHome = findViewById<ImageButton>(R.id.btn_home)
-        val btnDiary = findViewById<ImageButton>(R.id.btn_diary)
-        val btnProfile = findViewById<ImageButton>(R.id.btn_profile)
-        val btnSettings = findViewById<ImageButton>(R.id.btn_settings)
-
-        btnHome.isSelected = false
-        btnDiary.isSelected = false
-        btnProfile.isSelected = false
-        btnSettings.isSelected = false
-
-        btnHome.setOnClickListener { navigateTo(LandingPageActivity::class.java) }
-        btnDiary.setOnClickListener { navigateTo(DiaryListActivity::class.java) }
-        btnProfile.setOnClickListener { navigateTo(ProfilePageActivity::class.java) }
-        btnSettings.setOnClickListener { navigateTo(SettingsPageActivity::class.java) }
-    }
-
-    private fun <T : Activity> navigateTo(activityClass: Class<T>) {
-        startActivity(Intent(this, activityClass))
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+        loadEntries()
     }
 
     override fun onResume() {
         super.onResume()
-        loadNotes()
+        val user = userRepository.getCurrentUser() ?: return
+        currentUsername = user.username
+        currentSign = user.zodiacSign
+        BottomNavHelper.setup(this, BottomNavHelper.Tab.DIARY)
+        showZodiacQuote()
+        loadEntries()
     }
 
-    private fun loadNotes() {
-        diaryEntries.clear()
-        entryKeys.clear()
+    private fun initViews() {
+        recyclerView = findViewById(R.id.diary_recycler_view)
+        emptyStateLayout = findViewById(R.id.layout_empty_diary)
+        emptyTitleText = findViewById(R.id.txt_empty_diary_title)
+        emptySubtitleText = findViewById(R.id.txt_empty_diary_subtitle)
+        countBadgeText = findViewById(R.id.txt_diary_count_badge)
+        searchEditText = findViewById(R.id.edittext_search_diary)
 
-        val currentUserId = UserSession.userData?.username ?: return
-        val sharedPreferences = getSharedPreferences("DiaryPrefs", Context.MODE_PRIVATE)
-        val noteCount = sharedPreferences.getInt("${currentUserId}_noteCount", 0)
+        adapter = DiaryAdapter(
+            onEntryClick = { entry -> openEntryViewer(entry) },
+            onDeleteClick = { entry -> confirmDeleteEntry(entry) }
+        )
+        recyclerView.layoutManager = LinearLayoutManager(this)
+        recyclerView.adapter = adapter
 
-        for (i in 0 until noteCount) {
-            val isDeleted = sharedPreferences.getBoolean("${currentUserId}_note_deleted_$i", false)
-            if (!isDeleted) {
-                val title = sharedPreferences.getString("${currentUserId}_note_title_$i", null)
-                if (!title.isNullOrEmpty()) {
-                    diaryEntries.add(title)
-                    entryKeys.add(i.toString())
-                }
-            }
+        findViewById<FloatingActionButton>(R.id.btn_add_note).setOnClickListener {
+            startActivity(Intent(this, DiaryPageActivity::class.java))
         }
 
-        diaryEntries.reverse()
-        entryKeys.reverse()
-        adapter.notifyDataSetChanged()
+        searchEditText.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                loadEntries()
+            }
+
+            override fun afterTextChanged(s: Editable?) {}
+        })
     }
 
+    @SuppressLint("SetTextI18n")
     private fun showZodiacQuote() {
-        val sign = UserSession.userData?.zodiacSign ?: return
-        val quote = ZodiacQuoteProvider.getQuoteForSign(sign)
+        val quote = ZodiacQuoteProvider.getQuoteForSign(currentSign)
+        findViewById<TextView>(R.id.txtZodiacEmoji).text = quote.emoji
+        findViewById<TextView>(R.id.txtZodiacSign).text = "$currentSign Daily Quote"
+        findViewById<TextView>(R.id.txtZodiacQuote).text = quote.quote
+        findViewById<TextView>(R.id.txtQuoteAuthor).text = quote.author
 
-        txtSign.text = sign
-        txtEmoji.text = quote.emoji
-        txtQuote.text = quote.quote
-        txtAuthor.text = quote.author
+        findViewById<View>(R.id.btn_write_from_quote).setOnClickListener {
+            val intent = Intent(this, DiaryPageActivity::class.java).apply {
+                putExtra("prefill_title", "$currentSign Reflection")
+                putExtra("prefill_content", "${quote.quote}\n${quote.author}\n\nMy reflection:\n")
+            }
+            startActivity(intent)
+        }
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        @Suppress("DEPRECATION")
-        super.onBackPressed()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+    @SuppressLint("SetTextI18n")
+    private fun loadEntries() {
+        val query = searchEditText.text?.toString().orEmpty()
+        val totalCount = diaryRepository.getEntryCount(currentUsername)
+        val entries = diaryRepository.searchEntries(currentUsername, query)
+
+        countBadgeText.text = if (totalCount == 1) "1 entry" else "$totalCount entries"
+        adapter.submitList(entries)
+
+        if (entries.isEmpty()) {
+            recyclerView.visibility = View.GONE
+            emptyStateLayout.visibility = View.VISIBLE
+            if (query.isNotBlank()) {
+                emptyTitleText.text = "No matching entries"
+                emptySubtitleText.text = "Try a different keyword or clear the search box."
+            } else {
+                emptyTitleText.text = "No diary entries yet"
+                emptySubtitleText.text = "Tap + to write how today’s zodiac hue inspires you."
+            }
+        } else {
+            recyclerView.visibility = View.VISIBLE
+            emptyStateLayout.visibility = View.GONE
+        }
     }
 
-    override fun finish() {
-        super.finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
+    private fun openEntryViewer(entry: DiaryEntry) {
+        val intent = Intent(this, ViewDiaryActivity::class.java).apply {
+            putExtra(ViewDiaryActivity.EXTRA_ENTRY_ID, entry.id)
+        }
+        startActivity(intent)
     }
 
+    private fun confirmDeleteEntry(entry: DiaryEntry) {
+        MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
+            .setTitle("Delete Entry")
+            .setMessage("Delete \"${entry.title}\"? This action cannot be undone.")
+            .setPositiveButton("Delete") { _, _ ->
+                if (diaryRepository.deleteEntry(currentUsername, entry.id)) {
+                    Toast.makeText(this, "Entry deleted", Toast.LENGTH_SHORT).show()
+                    loadEntries()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
 }

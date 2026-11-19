@@ -1,159 +1,255 @@
 package com.android.zodiachue
 
 import android.annotation.SuppressLint
-import android.app.Activity
-import android.app.AlertDialog
-import android.content.SharedPreferences
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
+import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import android.widget.ImageView
-import android.widget.TextView
-import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
-import com.android.zodiachue.data.UserData
+import androidx.appcompat.app.AppCompatActivity
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.android.zodiachue.data.ZodiacData
+import com.android.zodiachue.helper.BottomNavHelper
 import com.android.zodiachue.helper.ImageManager
-import com.android.zodiachue.helper.UserSession
+import com.android.zodiachue.helper.ImagePreviewDialog
+import com.android.zodiachue.helper.UserRepository
 import com.android.zodiachue.helper.ZodiacProvider
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-class LandingPageActivity : Activity() {
-    private lateinit var sharedPrefs: SharedPreferences
-    private lateinit var loggedInUser: UserData
+class LandingPageActivity : AppCompatActivity() {
+    private lateinit var userRepository: UserRepository
     private lateinit var imageManager: ImageManager
-    private lateinit var dummyContainer: LinearLayout
+    private var userZodiacSign: String = "Leo"
+    private var activeSign: String = "Leo"
 
-    private var currentSelectedImageRes: Int? = null
-    private val gson = Gson()
-
-    @SuppressLint("SetTextI18n")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_landing_page)
 
-        sharedPrefs = getSharedPreferences("ZodiacHuePrefs", MODE_PRIVATE)
-        imageManager = ImageManager(this, sharedPrefs)
-        dummyContainer = LinearLayout(this)
+        userRepository = UserRepository(this)
+        val currentUser = userRepository.getCurrentUser()
+        if (currentUser == null) {
+            startActivity(Intent(this, LoginPageActivity::class.java))
+            finish()
+            return
+        }
 
-        val user = UserSession.userData
-        val firstName = user?.firstName ?: "User"
-        findViewById<TextView>(R.id.textview_hellouser).text = "Hello $firstName,\nYour color of the day is"
+        imageManager = ImageManager(this, currentUser.username)
+        userZodiacSign = currentUser.zodiacSign
+        activeSign = userZodiacSign
 
-        val usersMap = getUsersMap()
-        loggedInUser = usersMap[user?.username] ?: return
-
-        setupNavigationButtons()
-        displayZodiacDetails(loggedInUser.zodiacSign)
+        BottomNavHelper.setup(this, BottomNavHelper.Tab.HOME)
+        setupHeaderActions()
+        renderUserHeader()
+        displayZodiacDetails(activeSign)
     }
 
-    private fun getUsersMap(): MutableMap<String, UserData> {
-        val usersJson = sharedPrefs.getString("users", null)
-        return if (usersJson != null) {
-            gson.fromJson(usersJson, object : TypeToken<MutableMap<String, UserData>>() {}.type)
-        } else mutableMapOf()
+    override fun onResume() {
+        super.onResume()
+        val currentUser = userRepository.getCurrentUser() ?: return
+        val wasFollowingOwnSign = activeSign.equals(userZodiacSign, ignoreCase = true)
+        userZodiacSign = currentUser.zodiacSign
+        if (wasFollowingOwnSign) {
+            activeSign = userZodiacSign
+        }
+        BottomNavHelper.setup(this, BottomNavHelper.Tab.HOME)
+        renderUserHeader()
+        displayZodiacDetails(activeSign)
     }
 
-    private fun setupNavigationButtons() {
-        val navButtons = listOf(
-            R.id.btn_home to LandingPageActivity::class.java,
-            R.id.btn_diary to DiaryListActivity::class.java,
-            R.id.btn_profile to ProfilePageActivity::class.java,
-            R.id.btn_settings to SettingsPageActivity::class.java
-        )
+    @SuppressLint("SetTextI18n")
+    private fun renderUserHeader() {
+        val user = userRepository.getCurrentUser() ?: return
+        val dateText = SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(Date())
+        findViewById<TextView>(R.id.textview_today_date).text = dateText
+        findViewById<TextView>(R.id.textview_hellouser).text = "Hello, ${user.firstName}"
+    }
 
-        for ((id, activityClass) in navButtons) {
-            val button = findViewById<ImageButton>(id)
-            button.setOnClickListener {
-                resetButtonSelections()
-                button.isSelected = true
-                val intent = Intent(this, activityClass)
-                if (activityClass == ProfilePageActivity::class.java) {
-                    startActivityForResult(intent, 1)
-                } else {
-                    startActivity(intent)
-                }
-                @Suppress("DEPRECATION")
-                overridePendingTransition(0, 0)
-            }
+    private fun setupHeaderActions() {
+        findViewById<View>(R.id.btn_switch_sign).setOnClickListener {
+            showZodiacPickerBottomSheet()
+        }
+        findViewById<View>(R.id.banner_preview_sign).setOnClickListener {
+            activeSign = userZodiacSign
+            displayZodiacDetails(activeSign)
         }
     }
 
-    private fun resetButtonSelections() {
-        listOf(
-            R.id.btn_home,
-            R.id.btn_diary,
-            R.id.btn_profile,
-            R.id.btn_settings
-        ).forEach { findViewById<ImageButton>(it).isSelected = false }
-    }
-
+    @SuppressLint("SetTextI18n")
     private fun displayZodiacDetails(zodiacSign: String) {
-        val data =  ZodiacProvider.getZodiacDataForSign(zodiacSign)
+        val data = ZodiacProvider.getZodiacDataForSign(zodiacSign)
+        val parsedColor = Color.parseColor(data.colorHex)
+
+        findViewById<TextView>(R.id.textview_header_sign).text = "${data.emoji} ${data.sign} ▾"
+
+        val previewBanner = findViewById<View>(R.id.banner_preview_sign)
+        val isPreviewingOther = !data.sign.equals(userZodiacSign, ignoreCase = true)
+        previewBanner.visibility = if (isPreviewingOther) View.VISIBLE else View.GONE
+        if (isPreviewingOther) {
+            findViewById<TextView>(R.id.textview_preview_banner).text =
+                "Previewing ${data.sign} • Tap to return to $userZodiacSign"
+        }
+
+        (findViewById<View>(R.id.view_color_swatch).background?.mutate() as? GradientDrawable)
+            ?.setColor(parsedColor)
 
         findViewById<TextView>(R.id.textview_color_name).apply {
             text = data.colorName
-            setTextColor(Color.parseColor(data.colorHex))
+            setTextColor(parsedColor)
         }
 
-        findViewById<TextView>(R.id.textview_color_description).text = data.description
-        findViewById<TextView>(R.id.textview_color_reading).text = data.reading
-        findViewById<ImageView>(R.id.imageview_main_color).setImageResource(data.mainImageRes)
+        findViewById<TextView>(R.id.textview_sign_meta).text =
+            "${data.sign} • ${data.dateRange} • ${data.element}"
 
-        setupGalleryImage(R.id.imageview_1, data.galleryImages[0])
-        setupGalleryImage(R.id.imageview_2, data.galleryImages[1])
-    }
-
-    private fun setupGalleryImage(imageViewId: Int, imageRes: Int) {
-        findViewById<ImageView>(imageViewId).apply {
-            setImageResource(imageRes)
-            setOnLongClickListener {
-                currentSelectedImageRes = imageRes
-                showAddImageConfirmation()
-                true
+        findViewById<TextView>(R.id.btn_copy_hex).apply {
+            text = data.colorHex
+            setOnClickListener {
+                val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                clipboard.setPrimaryClip(ClipData.newPlainText("ZodiacHue Color", data.colorHex))
+                Toast.makeText(this@LandingPageActivity, "Copied ${data.colorHex}", Toast.LENGTH_SHORT).show()
             }
         }
+
+        findViewById<ImageView>(R.id.imageview_main_color).setImageResource(data.mainImageRes)
+        findViewById<TextView>(R.id.textview_color_description).text = data.overview
+        findViewById<TextView>(R.id.textview_mood_influence).text = data.moodInfluence
+        findViewById<TextView>(R.id.textview_aesthetic_wear).text = data.aestheticToWear
+        findViewById<TextView>(R.id.textview_avoid_colors).text = data.avoid
+
+        findViewById<View>(R.id.view_reading_accent).setBackgroundColor(parsedColor)
+        findViewById<TextView>(R.id.textview_color_reading).text = data.reading
+
+        findViewById<View>(R.id.btn_reflect_reading).setOnClickListener {
+            val intent = Intent(this, DiaryPageActivity::class.java).apply {
+                putExtra("prefill_title", "${data.sign} • ${data.colorName}")
+                putExtra("prefill_content", "Today's hue is ${data.colorName} (${data.colorHex}).\n\n")
+            }
+            startActivity(intent)
+        }
+
+        setupOutfitCard(
+            imageRes = data.galleryImages[0],
+            imageView = findViewById(R.id.imageview_1),
+            saveButton = findViewById(R.id.btn_save_look_1),
+            saveIcon = findViewById(R.id.icon_save_look_1),
+            saveLabel = findViewById(R.id.txt_save_look_1)
+        )
+        setupOutfitCard(
+            imageRes = data.galleryImages[1],
+            imageView = findViewById(R.id.imageview_2),
+            saveButton = findViewById(R.id.btn_save_look_2),
+            saveIcon = findViewById(R.id.icon_save_look_2),
+            saveLabel = findViewById(R.id.txt_save_look_2)
+        )
     }
 
-    private fun showAddImageConfirmation() {
-        currentSelectedImageRes?.let { imageRes ->
-            AlertDialog.Builder(this, R.style.CustomAlertDialog)
-                .setTitle("Add to Profile")
-                .setMessage("Do you want to add this image to your profile?")
-                .setPositiveButton("Yes") { _, _ ->
-                    saveSelectedImage(imageRes)
-                    setResult(RESULT_OK)
-                }
-                .setNegativeButton("No", null)
-                .show()
-                .apply {
-                    getButton(AlertDialog.BUTTON_POSITIVE)?.setTextColor(Color.parseColor("#4a6df7"))
-                    getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#4a6df7"))
-                }
+    private fun setupOutfitCard(
+        imageRes: Int,
+        imageView: ImageView,
+        saveButton: View,
+        saveIcon: ImageView,
+        saveLabel: TextView
+    ) {
+        imageView.setImageResource(imageRes)
+
+        fun refreshSavedBadge() {
+            val saved = imageManager.isImageSaved(imageRes)
+            saveIcon.setImageResource(
+                if (saved) R.drawable.ic_bookmark_filled else R.drawable.ic_bookmark_outline
+            )
+            saveLabel.text = if (saved) "Saved" else "Save"
+        }
+
+        fun toggleSave() {
+            if (imageManager.isImageSaved(imageRes)) {
+                imageManager.removeImage(imageRes)
+                Toast.makeText(this, "Removed from your profile moodboard", Toast.LENGTH_SHORT).show()
+            } else {
+                imageManager.addImage(imageRes)
+                Toast.makeText(this, "Saved to your profile moodboard!", Toast.LENGTH_SHORT).show()
+            }
+            refreshSavedBadge()
+        }
+
+        refreshSavedBadge()
+        saveButton.setOnClickListener { toggleSave() }
+
+        imageView.setOnClickListener {
+            val isSaved = imageManager.isImageSaved(imageRes)
+            ImagePreviewDialog.show(
+                activity = this,
+                resId = imageRes,
+                positiveLabel = if (isSaved) "Remove" else "Save to Profile"
+            ) {
+                toggleSave()
+            }
+        }
+
+        imageView.setOnLongClickListener {
+            toggleSave()
+            true
         }
     }
 
-    private fun saveSelectedImage(imageRes: Int) {
-        imageManager.loadSavedImages()
-        if (imageManager.addImage(imageRes, dummyContainer)) {
-            setResult(RESULT_OK)
-            Toast.makeText(this, "Image added to profile successfully!", Toast.LENGTH_SHORT).show()
+    private fun showZodiacPickerBottomSheet() {
+        val dialog = BottomSheetDialog(this, R.style.CosmicBottomSheetTheme)
+        val sheetView = layoutInflater.inflate(R.layout.bottom_sheet_zodiac_picker, null)
+        val recycler = sheetView.findViewById<RecyclerView>(R.id.recycler_zodiac_picker)
+        recycler.layoutManager = LinearLayoutManager(this)
+        recycler.adapter = ZodiacPickerAdapter(ZodiacProvider.allZodiacData) { chosen ->
+            activeSign = chosen.sign
+            displayZodiacDetails(activeSign)
+            dialog.dismiss()
         }
+        dialog.setContentView(sheetView)
+        dialog.show()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        @Suppress("DEPRECATION")
-        super.onBackPressed()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
-    }
+    private inner class ZodiacPickerAdapter(
+        private val signs: List<ZodiacData>,
+        private val onSelect: (ZodiacData) -> Unit
+    ) : RecyclerView.Adapter<ZodiacPickerAdapter.Holder>() {
 
-    override fun finish() {
-        super.finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
-    }
+        inner class Holder(view: View) : RecyclerView.ViewHolder(view) {
+            val emoji: TextView = view.findViewById(R.id.txt_picker_emoji)
+            val sign: TextView = view.findViewById(R.id.txt_picker_sign)
+            val yoursBadge: TextView = view.findViewById(R.id.txt_picker_yours_badge)
+            val subtitle: TextView = view.findViewById(R.id.txt_picker_subtitle)
+            val swatch: View = view.findViewById(R.id.view_picker_swatch)
+        }
 
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder {
+            val view = LayoutInflater.from(parent.context)
+                .inflate(R.layout.item_zodiac_picker, parent, false)
+            return Holder(view)
+        }
+
+        @SuppressLint("SetTextI18n")
+        override fun onBindViewHolder(holder: Holder, position: Int) {
+            val item = signs[position]
+            holder.emoji.text = item.emoji
+            holder.sign.text = item.sign
+            holder.yoursBadge.visibility =
+                if (item.sign.equals(userZodiacSign, ignoreCase = true)) View.VISIBLE else View.GONE
+            holder.subtitle.text = "${item.dateRange} • ${item.colorName}"
+            (holder.swatch.background?.mutate() as? GradientDrawable)
+                ?.setColor(Color.parseColor(item.colorHex))
+            holder.itemView.setOnClickListener { onSelect(item) }
+        }
+
+        override fun getItemCount(): Int = signs.size
+    }
 }

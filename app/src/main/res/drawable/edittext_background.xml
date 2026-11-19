@@ -1,7 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="#33000000" />
-    <stroke android:width="2dp" android:color="#4a6df7" />
-    <corners android:radius="12dp" />
-    <padding android:left="15dp" android:right="15dp" android:top="10dp" android:bottom="10dp" />
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/cosmic_input_bg" />
+    <stroke
+        android:width="1.2dp"
+        android:color="@color/cosmic_stroke" />
+    <corners android:radius="14dp" />
+    <padding
+        android:left="14dp"
+        android:right="14dp"
+        android:top="12dp"
+        android:bottom="12dp" />
 </shape>

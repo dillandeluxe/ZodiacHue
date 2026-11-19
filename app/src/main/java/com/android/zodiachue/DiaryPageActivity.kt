@@ -1,61 +1,125 @@
 package com.android.zodiachue
 
-import android.app.Activity
-import android.content.Context
-import android.content.SharedPreferences
+import android.annotation.SuppressLint
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
+import android.widget.TextView
 import android.widget.Toast
-import com.android.zodiachue.helper.UserSession
+import androidx.appcompat.app.AppCompatActivity
+import com.android.zodiachue.helper.DiaryRepository
+import com.android.zodiachue.helper.UserRepository
+import com.android.zodiachue.helper.ZodiacProvider
+import com.google.android.material.chip.Chip
+import com.google.android.material.chip.ChipGroup
 
-class DiaryPageActivity : Activity() {
+class DiaryPageActivity : AppCompatActivity() {
+    companion object {
+        const val EXTRA_ENTRY_ID = "entry_id"
+    }
+
     private lateinit var titleEditText: EditText
     private lateinit var contentEditText: EditText
-    private lateinit var diaryPreferences: SharedPreferences
+    private lateinit var wordCountText: TextView
+    private lateinit var moodChipGroup: ChipGroup
+    private lateinit var diaryRepository: DiaryRepository
+    private lateinit var userRepository: UserRepository
 
-    private var isEditMode = false
-    private var noteKey: String = ""
-    private val currentUserId: String by lazy { UserSession.userData?.username ?: "" }
+    private var currentUsername: String = ""
+    private var currentZodiacSign: String = "Leo"
+    private var currentEntryId: String? = null
+
+    private val moodChipMap = mapOf(
+        R.id.chip_inspired to "✨ Inspired",
+        R.id.chip_radiant to "☀️ Radiant",
+        R.id.chip_calm to "🌊 Calm",
+        R.id.chip_reflective to "🌙 Reflective",
+        R.id.chip_bold to "🔥 Bold"
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        disableActivityTransitions()
         setContentView(R.layout.activity_diary_page)
 
+        userRepository = UserRepository(this)
+        val user = userRepository.getCurrentUser()
+        if (user == null) {
+            Toast.makeText(this, "Please sign in first", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
+        currentUsername = user.username
+        currentZodiacSign = user.zodiacSign
+        diaryRepository = DiaryRepository(this)
+
         initViews()
-        initPreferences()
-        checkUserAuthentication()
-        setupEditMode()
+        populateInitialState()
         setupSaveButton()
     }
 
+    @SuppressLint("SetTextI18n")
     private fun initViews() {
         titleEditText = findViewById(R.id.et_title)
         contentEditText = findViewById(R.id.et_content)
-    }
+        wordCountText = findViewById(R.id.txt_word_count)
+        moodChipGroup = findViewById(R.id.chip_group_mood)
 
-    private fun initPreferences() {
-        diaryPreferences = getSharedPreferences("DiaryPrefs", Context.MODE_PRIVATE)
-    }
+        findViewById<ImageButton>(R.id.btn_back_diary_page).setOnClickListener { finish() }
 
-    private fun checkUserAuthentication() {
-        if (currentUserId.isEmpty()) {
-            showToast("User not logged in")
-            finishWithNoTransition()
-        }
-    }
-
-    private fun setupEditMode() {
-        isEditMode = intent.getBooleanExtra("EDIT_MODE", false)
-        if (isEditMode) {
-            titleEditText.setText(intent.getStringExtra("title"))
-            val content = intent.getStringExtra("content")
-            if (!content.isNullOrEmpty()) {
-                contentEditText.setText(content)
+        contentEditText.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                updateWordCount(s?.toString().orEmpty())
             }
-            noteKey = intent.getStringExtra("key") ?: ""
+
+            override fun afterTextChanged(s: Editable?) {}
+        })
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun updateWordCount(text: String) {
+        val words = text.trim().split(Regex("\\s+")).filter { it.isNotEmpty() }.size
+        wordCountText.text = if (words == 1) "1 word" else "$words words"
+    }
+
+    @SuppressLint("SetTextI18n")
+    private fun populateInitialState() {
+        val entryId = intent.getStringExtra(EXTRA_ENTRY_ID)
+        if (!entryId.isNullOrBlank()) {
+            val existing = diaryRepository.getEntry(currentUsername, entryId)
+            if (existing != null) {
+                currentEntryId = existing.id
+                findViewById<TextView>(R.id.txt_diary_page_header).text = "Edit Entry"
+                titleEditText.setText(existing.title)
+                contentEditText.setText(existing.content)
+                selectMoodChip(existing.mood)
+                updateWordCount(existing.content)
+                return
+            }
         }
+
+        findViewById<TextView>(R.id.txt_diary_page_header).text = "New Entry"
+        intent.getStringExtra("prefill_title")?.let { titleEditText.setText(it) }
+        intent.getStringExtra("prefill_content")?.let {
+            contentEditText.setText(it)
+            contentEditText.setSelection(it.length)
+            updateWordCount(it)
+        }
+    }
+
+    private fun selectMoodChip(mood: String) {
+        val targetId = moodChipMap.entries.firstOrNull {
+            it.value.equals(mood, ignoreCase = true)
+        }?.key ?: R.id.chip_inspired
+        findViewById<Chip>(targetId)?.isChecked = true
+    }
+
+    private fun getSelectedMood(): String {
+        return moodChipMap[moodChipGroup.checkedChipId] ?: "✨ Inspired"
     }
 
     private fun setupSaveButton() {
@@ -63,62 +127,25 @@ class DiaryPageActivity : Activity() {
             val title = titleEditText.text.toString().trim()
             val content = contentEditText.text.toString().trim()
 
-            if (validateInput(title, content)) {
-                saveNote(title, content)
+            if (title.isEmpty() || content.isEmpty()) {
+                Toast.makeText(this, "Please enter both a title and your reflection.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
             }
+
+            val zodiacColorHex = ZodiacProvider.getZodiacDataForSign(currentZodiacSign).colorHex
+            diaryRepository.saveEntry(
+                username = currentUsername,
+                entryId = currentEntryId,
+                title = title,
+                content = content,
+                mood = getSelectedMood(),
+                zodiacSign = currentZodiacSign,
+                colorHex = zodiacColorHex
+            )
+
+            val message = if (currentEntryId != null) "Entry updated!" else "Entry saved!"
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            finish()
         }
-    }
-
-    private fun validateInput(title: String, content: String): Boolean {
-        return when {
-            title.isEmpty() || content.isEmpty() -> {
-                showToast("Please fill in both title and content!")
-                false
-            }
-            else -> true
-        }
-    }
-
-    private fun saveNote(title: String, content: String) {
-        with(diaryPreferences.edit()) {
-            if (isEditMode) {
-                putString("${currentUserId}_note_title_$noteKey", title)
-                putString("${currentUserId}_note_content_$noteKey", content)
-                showToast("Note updated!")
-            } else {
-                val noteCount = diaryPreferences.getInt("${currentUserId}_noteCount", 0)
-                putString("${currentUserId}_note_title_$noteCount", title)
-                putString("${currentUserId}_note_content_$noteCount", content)
-                putInt("${currentUserId}_noteCount", noteCount + 1)
-                showToast("Note saved!")
-            }
-            apply()
-        }
-        finishWithNoTransition()
-    }
-
-    private fun showToast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun disableActivityTransitions() {
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        @Suppress("DEPRECATION")
-        super.onBackPressed()
-        disableActivityTransitions()
-    }
-
-    override fun finish() {
-        super.finish()
-        disableActivityTransitions()
-    }
-
-    private fun finishWithNoTransition() {
-        finish()
     }
 }

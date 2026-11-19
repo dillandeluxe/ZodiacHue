@@ -1,144 +1,98 @@
 package com.android.zodiachue
 
-import android.app.Activity
-import android.content.SharedPreferences
+import android.annotation.SuppressLint
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ImageButton
+import android.widget.Spinner
+import android.widget.TextView
 import android.widget.Toast
-import com.android.zodiachue.data.UserData
-import com.android.zodiachue.helper.UserSession
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
+import androidx.appcompat.app.AppCompatActivity
+import com.android.zodiachue.helper.DateSpinnerHelper
+import com.android.zodiachue.helper.UserRepository
+import com.android.zodiachue.helper.ZodiacCalculator
+import com.android.zodiachue.helper.ZodiacProvider
 
-class EditProfilePageActivity : Activity() {
-
-    private lateinit var sharedPrefs: SharedPreferences
+class EditProfilePageActivity : AppCompatActivity() {
+    private lateinit var userRepository: UserRepository
     private lateinit var firstNameEditText: EditText
     private lateinit var lastNameEditText: EditText
+    private lateinit var zodiacPreviewText: TextView
+
+    private var currentUsername: String = ""
+    private var selectedBirthDate: String = ""
+    private var selectedZodiacSign: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_edit_profile_page)
 
-        sharedPrefs = getSharedPreferences("ZodiacHuePrefs", MODE_PRIVATE)
-        initializeViews()
-        setupTextWatchers()
+        userRepository = UserRepository(this)
+        val user = userRepository.getCurrentUser()
+        if (user == null) {
+            finish()
+            return
+        }
+
+        currentUsername = user.username
+        selectedBirthDate = user.birthDate
+        selectedZodiacSign = user.zodiacSign
+
+        initViews(user.firstName, user.lastName, user.birthDate)
         setupSaveButton()
     }
 
-    private fun initializeViews() {
+    @SuppressLint("SetTextI18n")
+    private fun initViews(firstName: String, lastName: String, birthDate: String) {
+        findViewById<ImageButton>(R.id.btn_back_edit_profile).setOnClickListener { finish() }
+
         firstNameEditText = findViewById(R.id.edit_firstName)
         lastNameEditText = findViewById(R.id.edit_lastName)
+        zodiacPreviewText = findViewById(R.id.txt_edit_zodiac_preview)
 
-        UserSession.userData?.let {
-            firstNameEditText.hint = it.firstName
-            lastNameEditText.hint = it.lastName
+        firstNameEditText.setText(firstName)
+        lastNameEditText.setText(lastName)
+
+        DateSpinnerHelper.setupBirthDateSpinners(
+            context = this,
+            spinnerMonth = findViewById(R.id.spinner_edit_month),
+            spinnerDay = findViewById(R.id.spinner_edit_day),
+            spinnerYear = findViewById(R.id.spinner_edit_year),
+            initialBirthDate = birthDate
+        ) { month, day, year, sign ->
+            selectedBirthDate = ZodiacCalculator.formatBirthDate(month, day, year)
+            selectedZodiacSign = sign
+            val data = ZodiacProvider.getZodiacDataForSign(sign)
+            zodiacPreviewText.text = "Zodiac Sign: ${data.emoji} ${data.sign} (${data.colorName})"
         }
-    }
-
-    private fun setupTextWatchers() {
-        firstNameEditText.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) {}
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                if (!s.isNullOrEmpty()) {
-                    firstNameEditText.hint = ""
-                } else {
-                    UserSession.userData?.firstName?.let {
-                        firstNameEditText.hint = it
-                    }
-                }
-            }
-        })
-
-        lastNameEditText.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) {}
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                if (!s.isNullOrEmpty()) {
-                    lastNameEditText.hint = ""
-                } else {
-                    UserSession.userData?.lastName?.let {
-                        lastNameEditText.hint = it
-                    }
-                }
-            }
-        })
     }
 
     private fun setupSaveButton() {
         findViewById<Button>(R.id.btn_saveProfile).setOnClickListener {
-            val firstName = firstNameEditText.text.toString().trim().takeIf { it.isNotEmpty() }
-                ?: firstNameEditText.hint.toString()
-            val lastName = lastNameEditText.text.toString().trim().takeIf { it.isNotEmpty() }
-                ?: lastNameEditText.hint.toString()
+            val firstName = firstNameEditText.text.toString().trim()
+            val lastName = lastNameEditText.text.toString().trim()
 
-            if (firstName.isBlank() || lastName.isBlank()) {
-                showToast("All fields are required")
+            if (firstName.isEmpty() || lastName.isEmpty()) {
+                Toast.makeText(this, "First name and last name are required.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
-            updateUserProfile(firstName, lastName)
-            finishWithSuccess()
+            val updated = userRepository.updateProfile(
+                username = currentUsername,
+                firstName = firstName,
+                lastName = lastName,
+                birthDate = selectedBirthDate,
+                zodiacSign = selectedZodiacSign
+            )
+
+            if (updated) {
+                Toast.makeText(this, "Profile updated!", Toast.LENGTH_SHORT).show()
+                setResult(RESULT_OK)
+                finish()
+            } else {
+                Toast.makeText(this, "Could not update profile.", Toast.LENGTH_SHORT).show()
+            }
         }
-    }
-
-    private fun updateUserProfile(firstName: String, lastName: String) {
-        sharedPrefs.edit().apply {
-            putString("firstName", firstName)
-            putString("lastName", lastName)
-            apply()
-        }
-
-        UserSession.userData?.let { user ->
-            user.firstName = firstName
-            user.lastName = lastName
-            updateUsersMap(user)
-        }
-    }
-
-    private fun updateUsersMap(updatedUser: UserData) {
-        val usersJson = sharedPrefs.getString("users", null) ?: return
-        val usersMap = Gson().fromJson<MutableMap<String, UserData>>(
-            usersJson,
-            object : TypeToken<MutableMap<String, UserData>>() {}.type
-        )
-
-        usersMap[updatedUser.username]?.let {
-            it.firstName = updatedUser.firstName
-            it.lastName = updatedUser.lastName
-        }
-
-        sharedPrefs.edit()
-            .putString("users", Gson().toJson(usersMap))
-            .apply()
-    }
-
-    private fun finishWithSuccess() {
-        showToast("Profile updated successfully!")
-        setResult(RESULT_OK)
-        finishWithTransition()
-    }
-
-    private fun showToast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun finishWithTransition() {
-        finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        setResult(RESULT_CANCELED)
-        @Suppress("DEPRECATION")
-        super.onBackPressed()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
     }
 }

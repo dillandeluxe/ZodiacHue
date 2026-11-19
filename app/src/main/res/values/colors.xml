@@ -1,13 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
+    <color name="purple_500">#5B7CFA</color>
+    <color name="purple_700">#05081A</color>
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="dark_background">#222222</color>
-    <color name="indigo_accent">#4a6df7</color>
-    <color name="midnight_blue">#070c2a</color>
+    <color name="dark_background">#11183D</color>
+    <color name="indigo_accent">#5B7CFA</color>
+    <color name="indigo_accent_dark">#3F5CE0</color>
+    <color name="indigo_glow">#265B7CFA</color>
+    <color name="midnight_blue">#080D2B</color>
+
+    <!-- Cosmic Surface Palette -->
+    <color name="cosmic_bg_deep">#05081A</color>
+    <color name="cosmic_surface">#D90E1538</color>
+    <color name="cosmic_surface_solid">#121A42</color>
+    <color name="cosmic_surface_elevated">#E6162052</color>
+    <color name="cosmic_input_bg">#CC0A0F2B</color>
+    <color name="cosmic_stroke">#4D6B8AFF</color>
+    <color name="cosmic_divider">#335B7CFA</color>
+
+    <!-- Text Hierarchy -->
+    <color name="text_primary">#F5F7FF</color>
+    <color name="text_secondary">#B0BBE0</color>
+    <color name="text_muted">#7480A8</color>
+
+    <!-- Semantic Accents -->
+    <color name="danger_red">#FF5C77</color>
+    <color name="success_green">#4ADE80</color>
+    <color name="warning_amber">#FBBF24</color>
 </resources>

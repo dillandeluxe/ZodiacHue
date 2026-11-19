@@ -1,129 +1,111 @@
 package com.android.zodiachue
 
-import android.app.Activity
-import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
-import android.widget.EditText
+import android.widget.ImageButton
+import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+import com.android.zodiachue.data.DiaryEntry
+import com.android.zodiachue.helper.DiaryRepository
+import com.android.zodiachue.helper.UserRepository
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-class ViewDiaryActivity : Activity() {
+class ViewDiaryActivity : AppCompatActivity() {
     companion object {
-        private const val DIARY_PREFS_NAME = "DiaryPrefs"
-        const val EXTRA_TITLE = "title"
-        const val EXTRA_CONTENT = "content"
-        const val EXTRA_KEY = "key"
+        const val EXTRA_ENTRY_ID = "entry_id"
     }
 
-    private lateinit var titleEditText: EditText
-    private lateinit var contentEditText: EditText
-    private lateinit var saveButton: Button
+    private lateinit var diaryRepository: DiaryRepository
+    private lateinit var userRepository: UserRepository
+    private var currentUsername: String = ""
+    private var entryId: String = ""
+    private var currentEntry: DiaryEntry? = null
 
-    private var entryKey: String = ""
-    private val diaryPreferences by lazy {
-        getSharedPreferences(DIARY_PREFS_NAME, Context.MODE_PRIVATE)
-    }
+    private val dateFormat = SimpleDateFormat("MMM dd, yyyy • h:mm a", Locale.getDefault())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_view_diary)
 
-        initializeViews()
-        loadEntryData()
-        setupSaveButton()
+        userRepository = UserRepository(this)
+        val user = userRepository.getCurrentUser()
+        if (user == null) {
+            finish()
+            return
+        }
+
+        currentUsername = user.username
+        diaryRepository = DiaryRepository(this)
+        entryId = intent.getStringExtra(EXTRA_ENTRY_ID).orEmpty()
+
+        setupActions()
+        loadEntry()
     }
 
-    private fun initializeViews() {
-        titleEditText = findViewById(R.id.tv_title)
-        contentEditText = findViewById(R.id.tv_content)
-        saveButton = findViewById(R.id.btn_save_changes)
+    override fun onResume() {
+        super.onResume()
+        loadEntry()
     }
 
-    private fun loadEntryData() {
-        with(intent) {
-            titleEditText.setText(getStringExtra(EXTRA_TITLE))
-            contentEditText.setText(getStringExtra(EXTRA_CONTENT))
-            entryKey = getStringExtra(EXTRA_KEY) ?: ""
+    private fun setupActions() {
+        findViewById<ImageButton>(R.id.btn_back_view_diary).setOnClickListener { finish() }
+
+        val openEditor = {
+            currentEntry?.let { entry ->
+                val intent = Intent(this, DiaryPageActivity::class.java).apply {
+                    putExtra(DiaryPageActivity.EXTRA_ENTRY_ID, entry.id)
+                }
+                startActivity(intent)
+            }
+        }
+
+        findViewById<ImageButton>(R.id.btn_edit_diary).setOnClickListener { openEditor() }
+        findViewById<Button>(R.id.btn_edit_entry_bottom).setOnClickListener { openEditor() }
+
+        findViewById<ImageButton>(R.id.btn_share_diary).setOnClickListener {
+            currentEntry?.let { entry ->
+                val shareBody = "${entry.title}\n(${entry.mood})\n\n${entry.content}\n\n— Written in ZodiacHue"
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_SUBJECT, entry.title)
+                    putExtra(Intent.EXTRA_TEXT, shareBody)
+                }
+                startActivity(Intent.createChooser(shareIntent, "Share Diary Entry"))
+            }
+        }
+
+        findViewById<ImageButton>(R.id.btn_delete_view_diary).setOnClickListener {
+            currentEntry?.let { entry ->
+                MaterialAlertDialogBuilder(this, R.style.CustomAlertDialog)
+                    .setTitle("Delete Entry")
+                    .setMessage("Delete \"${entry.title}\"? This action cannot be undone.")
+                    .setPositiveButton("Delete") { _, _ ->
+                        diaryRepository.deleteEntry(currentUsername, entry.id)
+                        Toast.makeText(this, "Entry deleted", Toast.LENGTH_SHORT).show()
+                        finish()
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+            }
         }
     }
 
-    private fun setupSaveButton() {
-        saveButton.setOnClickListener { saveChanges() }
-    }
-
-    private fun saveChanges() {
-        val (title, content) = getInputFields()
-
-        if (!validateInput(title, content)) return
-
-        if (saveEntryToPreferences(title, content)) {
-            showSuccessMessage()
-            finishWithTransition()
-        } else {
-            showErrorMessage()
+    private fun loadEntry() {
+        val entry = diaryRepository.getEntry(currentUsername, entryId)
+        if (entry == null) {
+            Toast.makeText(this, "Diary entry not found", Toast.LENGTH_SHORT).show()
+            finish()
+            return
         }
+        currentEntry = entry
+        findViewById<TextView>(R.id.tv_view_mood).text = entry.mood.ifBlank { "Inspired" }
+        findViewById<TextView>(R.id.tv_view_date).text = dateFormat.format(Date(entry.updatedAt))
+        findViewById<TextView>(R.id.tv_title).text = entry.title
+        findViewById<TextView>(R.id.tv_content).text = entry.content
     }
-
-    private fun getInputFields(): Pair<String, String> {
-        return Pair(
-            titleEditText.text.toString().trim(),
-            contentEditText.text.toString().trim()
-        )
-    }
-
-    private fun validateInput(title: String, content: String): Boolean {
-        if (title.isEmpty() || content.isEmpty()) {
-            showToast("Please fill in both title and content fields!")
-            return false
-        }
-        return true
-    }
-
-    private fun saveEntryToPreferences(title: String, content: String): Boolean {
-        val index = entryKey.toIntOrNull() ?: return false
-
-        diaryPreferences.edit().apply {
-            putString("note_title_$index", title)
-            putString("note_content_$index", content)
-            apply()
-        }
-        return true
-    }
-
-    private fun showSuccessMessage() {
-        showToast("Changes saved successfully!")
-    }
-
-    private fun showErrorMessage() {
-        showToast("Error: Could not save changes")
-    }
-
-    private fun showToast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun finishWithTransition() {
-        finish()
-        applyZeroTransition()
-    }
-
-    private fun applyZeroTransition() {
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
-    }
-
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        @Suppress("DEPRECATION")
-        super.onBackPressed()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
-    }
-
-    override fun finish() {
-        super.finish()
-        @Suppress("DEPRECATION")
-        overridePendingTransition(0, 0)
-    }
-
 }
