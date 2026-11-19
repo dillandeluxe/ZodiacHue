@@ -1,15 +1,16 @@
 # ZodiacHue
 
-An Android app that pairs your daily zodiac **Color of the Day** and styling inspiration with a private reflection diary.
+A modern **Jetpack Compose + Material 3** Android app that pairs daily rotating zodiac **Colors of the Day** and outfit harmony palettes with a guided reflection journal.
 
 ## Features
-- **Zodiac Hue & Explorer**: Daily lucky color swatch, copyable hex code, reading, mood/style breakdown, and a bottom-sheet explorer for all 12 signs.
-- **Outfit Moodboard**: Fullscreen look preview and per-user outfit bookmarking to your profile.
-- **Personal Diary**: Create, view, edit, search, share, and delete mood-tagged entries with timestamps and quote prompts.
-- **Accounts & Profile**: Auto zodiac detection from birth date, SHA-256 password hashing, persistent login, editable profile/birth date, and password updates.
+- **Instant Onboarding & Optional Accounts**: Pick your zodiac sign or birthday to start right away, or create/sign in to an account anytime (carrying forward guest entries and saved looks).
+- **Daily Hue & 7-Day Forecast**: Daily rotating colors per sign, 4-swatch **Harmony Palette** (Wear, Accent, Base, Avoid) with tap-to-copy hex codes, animated **Cosmic Vibe Meters** (Energy, Focus, Social), lucky number, power window, and outfit inspirations.
+- **Guided Journal**: Streak tracking, daily reflection prompts, mood filters, live search, sharing, and undoable delete.
+- **Explore & Compatibility**: Browse all 12 signs by element and check daily color synergy between any two signs.
+- **Profile & Moodboard**: Save curated outfit looks or upload your own gallery photos, edit your profile/birthday, and manage your account.
 
 ## Tech Stack
-Kotlin · AndroidX AppCompat · Material Components · RecyclerView · Gson · Glide
+Kotlin · Jetpack Compose · Material 3 · SharedPreferences + Gson
 
 ## Build & Test
 ```bash

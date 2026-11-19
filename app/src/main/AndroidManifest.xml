@@ -13,58 +13,15 @@
         android:theme="@style/Theme.ZodiacHue"
         tools:targetApi="31">
         <activity
-            android:name=".SplashActivity"
-            android:exported="true">
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity
-            android:name=".LoginPageActivity"
-            android:exported="false"
-            android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
-        <activity
-            android:name=".LandingPageActivity"
-            android:exported="false"
-            android:hardwareAccelerated="true" />
-        <activity
-            android:name=".ViewDiaryActivity"
-            android:exported="false"
-            android:hardwareAccelerated="true" />
-        <activity
-            android:name=".DiaryListActivity"
-            android:exported="false"
-            android:hardwareAccelerated="true" />
-        <activity
-            android:name=".RegisterPageActivity"
-            android:exported="false"
-            android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
-        <activity
-            android:name=".DiaryPageActivity"
-            android:exported="false"
-            android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
-        <activity
-            android:name=".EditProfilePageActivity"
-            android:exported="false"
-            android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize|stateHidden" />
-        <activity
-            android:name=".DeveloperPageActivity"
-            android:exported="false"
-            android:hardwareAccelerated="true" />
-        <activity
-            android:name=".ProfilePageActivity"
-            android:exported="false"
-            android:hardwareAccelerated="true" />
-        <activity
-            android:name=".SettingsPageActivity"
-            android:exported="false"
-            android:hardwareAccelerated="true" />
     </application>
 
 </manifest>

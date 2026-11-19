@@ -5,11 +5,41 @@ import android.content.SharedPreferences
 import com.android.zodiachue.data.DiaryEntry
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import java.util.Calendar
 import java.util.UUID
 
 class DiaryRepository(context: Context) {
     companion object {
         private const val DIARY_PREFS_NAME = "DiaryPrefs"
+
+        fun epochDayForTimestamp(millis: Long): Long {
+            val cal = Calendar.getInstance().apply { timeInMillis = millis }
+            return cal.get(Calendar.YEAR) * 366L + cal.get(Calendar.DAY_OF_YEAR)
+        }
+
+        fun calculateStreakDays(
+            entries: List<DiaryEntry>,
+            todayEpochDay: Long = DailyHueEngine.todayEpochDay()
+        ): Int {
+            if (entries.isEmpty()) return 0
+            val uniqueDays = entries.map { epochDayForTimestamp(it.updatedAt) }.toSet()
+            var cursor = when {
+                uniqueDays.contains(todayEpochDay) -> todayEpochDay
+                uniqueDays.contains(todayEpochDay - 1) -> todayEpochDay - 1
+                else -> return 0
+            }
+            var streak = 0
+            while (uniqueDays.contains(cursor)) {
+                streak++
+                cursor--
+            }
+            return streak
+        }
+
+        fun hasEntryToday(
+            entries: List<DiaryEntry>,
+            todayEpochDay: Long = DailyHueEngine.todayEpochDay()
+        ): Boolean = entries.any { epochDayForTimestamp(it.updatedAt) == todayEpochDay }
     }
 
     private val prefs: SharedPreferences =
@@ -79,6 +109,22 @@ class DiaryRepository(context: Context) {
         return savedEntry
     }
 
+    fun restoreEntry(username: String, entry: DiaryEntry) {
+        val entries = getEntries(username)
+        if (entries.none { it.id == entry.id }) {
+            entries.add(entry)
+            saveList(username, entries.sortedByDescending { it.updatedAt })
+        }
+    }
+
+    fun importEntries(username: String, entriesToImport: List<DiaryEntry>) {
+        val existing = getEntries(username)
+        val existingIds = existing.map { it.id }.toSet()
+        val merged = (existing + entriesToImport.filter { it.id !in existingIds })
+            .sortedByDescending { it.updatedAt }
+        saveList(username, merged)
+    }
+
     fun deleteEntry(username: String, entryId: String): Boolean {
         val entries = getEntries(username)
         val removed = entries.removeAll { it.id == entryId }
@@ -88,14 +134,22 @@ class DiaryRepository(context: Context) {
         return removed
     }
 
-    fun searchEntries(username: String, query: String): List<DiaryEntry> {
+    fun searchEntries(
+        username: String,
+        query: String,
+        moodFilter: String? = null
+    ): List<DiaryEntry> {
         val cleanQuery = query.trim().lowercase()
         val all = getEntries(username)
-        if (cleanQuery.isEmpty()) return all
-        return all.filter {
-            it.title.lowercase().contains(cleanQuery) ||
-                it.content.lowercase().contains(cleanQuery) ||
-                it.mood.lowercase().contains(cleanQuery)
+        return all.filter { entry ->
+            val matchesMood = moodFilter.isNullOrBlank() ||
+                moodFilter == "All" ||
+                entry.mood.equals(moodFilter, ignoreCase = true)
+            val matchesQuery = cleanQuery.isEmpty() ||
+                entry.title.lowercase().contains(cleanQuery) ||
+                entry.content.lowercase().contains(cleanQuery) ||
+                entry.mood.lowercase().contains(cleanQuery)
+            matchesMood && matchesQuery
         }
     }
 
@@ -103,7 +157,6 @@ class DiaryRepository(context: Context) {
         prefs.edit().putString(entriesKey(username), gson.toJson(entries)).apply()
     }
 
-    /** Preserves notes saved by the original 2nd-year version's indexed SharedPreferences keys. */
     private fun migrateLegacyEntriesIfNeeded(username: String) {
         if (prefs.getBoolean(migratedKey(username), false)) return
 
@@ -127,7 +180,7 @@ class DiaryRepository(context: Context) {
                             id = UUID.randomUUID().toString(),
                             title = title,
                             content = content,
-                            mood = "Inspired",
+                            mood = "✨ Inspired",
                             createdAt = timestamp,
                             updatedAt = timestamp
                         )

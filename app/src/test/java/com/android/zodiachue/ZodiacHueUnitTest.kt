@@ -1,5 +1,9 @@
 package com.android.zodiachue
 
+import com.android.zodiachue.data.DiaryEntry
+import com.android.zodiachue.helper.CompatibilityEngine
+import com.android.zodiachue.helper.DailyHueEngine
+import com.android.zodiachue.helper.DiaryRepository
 import com.android.zodiachue.helper.PasswordStrengthLevel
 import com.android.zodiachue.helper.SecurityUtils
 import com.android.zodiachue.helper.ZodiacCalculator
@@ -97,7 +101,6 @@ class ZodiacHueUnitTest {
         assertTrue(SecurityUtils.isHashed(hashed))
         assertTrue(SecurityUtils.verifyPassword(raw, hashed))
         assertFalse(SecurityUtils.verifyPassword("WrongPass1!", hashed))
-        // Legacy plaintext account compatibility
         assertTrue(SecurityUtils.verifyPassword("legacy123", "legacy123"))
     }
 
@@ -107,5 +110,43 @@ class ZodiacHueUnitTest {
         assertEquals(PasswordStrengthLevel.WEAK, SecurityUtils.evaluatePasswordStrength("abc"))
         assertEquals(PasswordStrengthLevel.MODERATE, SecurityUtils.evaluatePasswordStrength("cosmic12"))
         assertEquals(PasswordStrengthLevel.STRONG, SecurityUtils.evaluatePasswordStrength("Cosmic@2026"))
+    }
+
+    @Test
+    fun dailyHueEngine_rotatesHuesAndBuildsSevenDayForecast() {
+        val forecast = DailyHueEngine.getSevenDayForecast("Leo", baseEpochDay = 100L)
+        assertEquals(7, forecast.size)
+        val distinctColors = forecast.map { it.primaryColorName }.toSet()
+        assertEquals(7, distinctColors.size)
+        forecast.forEach { snap ->
+            assertEquals(4, snap.harmonyPalette.size)
+            assertTrue(snap.energyScore in 60..100)
+            assertTrue(snap.focusScore in 60..100)
+            assertTrue(snap.socialScore in 60..100)
+            assertTrue(snap.journalPrompt.isNotBlank())
+        }
+    }
+
+    @Test
+    fun compatibilityEngine_calculatesScoreAndBlendsHex() {
+        val compat = CompatibilityEngine.calculateDailyCompatibility("Leo", "Libra", epochDay = 200L)
+        assertTrue(compat.score in 65..98)
+        assertTrue(compat.blendedColorHex.startsWith("#"))
+        assertEquals(7, compat.blendedColorHex.length)
+        assertEquals("#7F7F7F", CompatibilityEngine.blendHexColors("#000000", "#FFFFFF"))
+    }
+
+    @Test
+    fun diaryRepository_calculatesStreakDaysCorrectly() {
+        val now = System.currentTimeMillis()
+        val dayMs = 86_400_000L
+        val entries = listOf(
+            DiaryEntry("1", "Today", "Body", updatedAt = now),
+            DiaryEntry("2", "Yesterday", "Body", updatedAt = now - dayMs),
+            DiaryEntry("3", "TwoDaysAgo", "Body", updatedAt = now - 2 * dayMs),
+            DiaryEntry("4", "FiveDaysAgo", "Body", updatedAt = now - 5 * dayMs)
+        )
+        assertEquals(3, DiaryRepository.calculateStreakDays(entries))
+        assertTrue(DiaryRepository.hasEntryToday(entries))
     }
 }

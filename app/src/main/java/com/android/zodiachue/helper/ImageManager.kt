@@ -1,12 +1,8 @@
 package com.android.zodiachue.helper
 
-import android.app.Activity
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.Uri
-import android.widget.ImageView
-import com.android.zodiachue.R
-import com.bumptech.glide.Glide
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 
@@ -16,6 +12,7 @@ class ImageManager(context: Context, private val username: String) {
     private val gson = Gson()
 
     private fun savedImagesKey() = "${username}_saved_images"
+    private fun customPhotoUrisKey() = "${username}_custom_photo_uris"
     private fun profileImageKey() = "${username}_profile_image_uri"
     private fun legacyMigratedKey() = "${username}_images_migrated_v2"
 
@@ -43,33 +40,47 @@ class ImageManager(context: Context, private val username: String) {
     fun removeImage(resId: Int): Boolean {
         val current = getSavedImages()
         val removed = current.remove(resId)
+        if (removed) saveImages(current)
+        return removed
+    }
+
+    fun getSavedCustomPhotoUris(): MutableList<String> {
+        val json = sharedPrefs.getString(customPhotoUrisKey(), null) ?: return mutableListOf()
+        return try {
+            val type = object : TypeToken<MutableList<String>>() {}.type
+            gson.fromJson<MutableList<String>>(json, type) ?: mutableListOf()
+        } catch (_: Exception) {
+            mutableListOf()
+        }
+    }
+
+    fun addCustomPhotoUri(uriString: String): Boolean {
+        val current = getSavedCustomPhotoUris()
+        if (current.contains(uriString)) return false
+        current.add(0, uriString)
+        sharedPrefs.edit().putString(customPhotoUrisKey(), gson.toJson(current)).apply()
+        return true
+    }
+
+    fun removeCustomPhotoUri(uriString: String): Boolean {
+        val current = getSavedCustomPhotoUris()
+        val removed = current.remove(uriString)
         if (removed) {
-            saveImages(current)
+            sharedPrefs.edit().putString(customPhotoUrisKey(), gson.toJson(current)).apply()
         }
         return removed
     }
 
     fun clearSavedImages() {
         saveImages(emptyList())
+        sharedPrefs.edit().putString(customPhotoUrisKey(), gson.toJson(emptyList<String>())).apply()
     }
 
     private fun saveImages(images: List<Int>) {
         sharedPrefs.edit().putString(savedImagesKey(), gson.toJson(images)).apply()
     }
 
-    fun loadProfileImage(activity: Activity, profileImageView: ImageView) {
-        val imageUriString = sharedPrefs.getString(profileImageKey(), null)
-        if (imageUriString.isNullOrBlank()) {
-            profileImageView.setImageResource(R.drawable.profile_icon)
-            return
-        }
-        Glide.with(activity)
-            .load(Uri.parse(imageUriString))
-            .placeholder(R.drawable.profile_icon)
-            .error(R.drawable.profile_icon)
-            .circleCrop()
-            .into(profileImageView)
-    }
+    fun getProfileImageUri(): String? = sharedPrefs.getString(profileImageKey(), null)
 
     fun saveProfileImageUri(uri: Uri) {
         sharedPrefs.edit()

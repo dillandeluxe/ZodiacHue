@@ -13,16 +13,21 @@ class UserRepository(context: Context) {
         private const val KEY_ACTIVE_USERNAME = "active_username"
         private const val KEY_REMEMBER_ME = "remember_me"
         private const val KEY_REMEMBERED_USERNAME = "remembered_username"
+        private const val KEY_GUEST_PROFILE = "guest_profile"
+        const val GUEST_USERNAME = "__guest__"
     }
 
+    private val appContext = context.applicationContext
     private val prefs: SharedPreferences =
-        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     private val gson = Gson()
 
     sealed class LoginResult {
         data class Success(val user: UserData) : LoginResult()
         data class Error(val message: String) : LoginResult()
     }
+
+    fun isGuestUser(user: UserData?): Boolean = user?.username == GUEST_USERNAME
 
     fun getUsersMap(): MutableMap<String, UserData> {
         val json = prefs.getString(KEY_USERS, null) ?: return mutableMapOf()
@@ -36,6 +41,39 @@ class UserRepository(context: Context) {
 
     private fun saveUsersMap(usersMap: Map<String, UserData>) {
         prefs.edit().putString(KEY_USERS, gson.toJson(usersMap)).apply()
+    }
+
+    /** Instant onboarding without forcing account creation upfront. */
+    fun createOrUpdateGuestProfile(
+        firstName: String,
+        birthDate: String,
+        zodiacSign: String
+    ): UserData {
+        val cleanFirst = firstName.trim().ifEmpty { "Stargazer" }
+        val guestUser = UserData(
+            firstName = cleanFirst,
+            lastName = "",
+            birthDate = birthDate,
+            zodiacSign = zodiacSign,
+            username = GUEST_USERNAME,
+            password = ""
+        )
+        prefs.edit()
+            .putString(KEY_GUEST_PROFILE, gson.toJson(guestUser))
+            .putString(KEY_ACTIVE_USERNAME, GUEST_USERNAME)
+            .putBoolean(KEY_REMEMBER_ME, true)
+            .apply()
+        UserSession.userData = guestUser
+        return guestUser
+    }
+
+    fun getGuestProfile(): UserData? {
+        val json = prefs.getString(KEY_GUEST_PROFILE, null) ?: return null
+        return try {
+            gson.fromJson(json, UserData::class.java)
+        } catch (_: Exception) {
+            null
+        }
     }
 
     fun registerUser(
@@ -58,7 +96,7 @@ class UserRepository(context: Context) {
         ) {
             return "Please fill in all fields."
         }
-        if (cleanUser.length < 3 || cleanUser.contains(" ")) {
+        if (cleanUser == GUEST_USERNAME || cleanUser.length < 3 || cleanUser.contains(" ")) {
             return "Username must be at least 3 characters without spaces."
         }
         if (cleanPass.length < SecurityUtils.MIN_PASSWORD_LENGTH) {
@@ -84,6 +122,9 @@ class UserRepository(context: Context) {
         )
         usersMap[cleanUser] = newUser
         saveUsersMap(usersMap)
+
+        // Carry forward any notes or outfits created during instant onboarding.
+        migrateGuestDataIfAny(cleanUser)
         return null
     }
 
@@ -104,7 +145,6 @@ class UserRepository(context: Context) {
             return LoginResult.Error("Incorrect password.")
         }
 
-        // Upgrade legacy plaintext passwords seamlessly to SHA-256 on login.
         if (!SecurityUtils.isHashed(savedUser.password)) {
             savedUser.password = SecurityUtils.hashPassword(cleanPass)
             usersMap[matchedEntry.key] = savedUser
@@ -120,7 +160,6 @@ class UserRepository(context: Context) {
             } else {
                 remove(KEY_REMEMBERED_USERNAME)
             }
-            // Remove legacy plaintext password key if present.
             remove("remembered_password")
             apply()
         }
@@ -140,7 +179,11 @@ class UserRepository(context: Context) {
     fun restoreActiveSession(): UserData? {
         UserSession.userData?.let { return it }
         val activeUsername = prefs.getString(KEY_ACTIVE_USERNAME, null) ?: return null
-        val user = getUsersMap()[activeUsername] ?: return null
+        val user = if (activeUsername == GUEST_USERNAME) {
+            getGuestProfile()
+        } else {
+            getUsersMap()[activeUsername]
+        } ?: return null
         UserSession.userData = user
         return user
     }
@@ -156,8 +199,23 @@ class UserRepository(context: Context) {
     ): Boolean {
         val cleanFirst = firstName.trim()
         val cleanLast = lastName.trim()
-        if (cleanFirst.isEmpty() || cleanLast.isEmpty() || zodiacSign.isBlank()) return false
+        if (cleanFirst.isEmpty() || zodiacSign.isBlank()) return false
 
+        if (username == GUEST_USERNAME) {
+            val updatedGuest = UserData(
+                firstName = cleanFirst,
+                lastName = cleanLast,
+                birthDate = birthDate,
+                zodiacSign = zodiacSign,
+                username = GUEST_USERNAME,
+                password = ""
+            )
+            prefs.edit().putString(KEY_GUEST_PROFILE, gson.toJson(updatedGuest)).apply()
+            UserSession.userData = updatedGuest
+            return true
+        }
+
+        if (cleanLast.isEmpty()) return false
         val usersMap = getUsersMap()
         val user = usersMap[username] ?: return false
         user.firstName = cleanFirst
@@ -171,6 +229,7 @@ class UserRepository(context: Context) {
     }
 
     fun changePassword(username: String, currentPassword: String, newPassword: String): String? {
+        if (username == GUEST_USERNAME) return "Sign in to an account to set a password."
         val cleanNew = newPassword.trim()
         if (cleanNew.length < SecurityUtils.MIN_PASSWORD_LENGTH) {
             return "New password must be at least ${SecurityUtils.MIN_PASSWORD_LENGTH} characters."
@@ -187,7 +246,7 @@ class UserRepository(context: Context) {
         return null
     }
 
-    /** Clears only active session state while keeping all user accounts & diaries intact. */
+    /** Logs out of a registered account and falls back to guest/onboarding cleanly without erasing saved accounts. */
     fun logout() {
         UserSession.userData = null
         prefs.edit()
@@ -195,5 +254,17 @@ class UserRepository(context: Context) {
             .putBoolean(KEY_REMEMBER_ME, false)
             .remove("remembered_password")
             .apply()
+    }
+
+    private fun migrateGuestDataIfAny(targetUsername: String) {
+        val diaryRepo = DiaryRepository(appContext)
+        val guestEntries = diaryRepo.getEntries(GUEST_USERNAME)
+        if (guestEntries.isNotEmpty() && diaryRepo.getEntryCount(targetUsername) == 0) {
+            diaryRepo.importEntries(targetUsername, guestEntries)
+        }
+        val guestImages = ImageManager(appContext, GUEST_USERNAME)
+        val targetImages = ImageManager(appContext, targetUsername)
+        guestImages.getSavedImages().forEach { targetImages.addImage(it) }
+        guestImages.getSavedCustomPhotoUris().forEach { targetImages.addCustomPhotoUri(it) }
     }
 }
