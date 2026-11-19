@@ -112,7 +112,7 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="10dp"
-                    android:text=""
+                    android:text="@string/dillan_marquin_ycoy"
                     android:textColor="@color/indigo_accent"
                     android:textSize="17sp"
                     android:textStyle="bold" />
