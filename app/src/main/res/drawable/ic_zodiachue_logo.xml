@@ -1,0 +1,74 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <!-- Deep cosmic circular emblem -->
+    <path android:pathData="M48,4 A44,44 0 1,1 47.99,4 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="68"
+                android:centerY="24"
+                android:gradientRadius="72"
+                android:type="radial">
+                <item
+                    android:color="#FF1E2D6E"
+                    android:offset="0.0" />
+                <item
+                    android:color="#FF0B112B"
+                    android:offset="0.7" />
+                <item
+                    android:color="#FF06091A"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Prismatic zodiac-hue outer ring -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M48,9 A39,39 0 1,1 47.99,9 Z"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round">
+        <aapt:attr name="android:strokeColor">
+            <gradient
+                android:endX="84"
+                android:endY="84"
+                android:startX="12"
+                android:startY="12"
+                android:type="linear">
+                <item
+                    android:color="#FFFBBF24"
+                    android:offset="0.0" />
+                <item
+                    android:color="#FFFF6F61"
+                    android:offset="0.33" />
+                <item
+                    android:color="#FF6B8AFF"
+                    android:offset="0.68" />
+                <item
+                    android:color="#FF00BCD4"
+                    android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Fine inner orbital circle -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M48,18 A30,30 0 1,1 47.99,18 Z"
+        android:strokeColor="#38FFFFFF"
+        android:strokeWidth="1.0" />
+
+    <!-- Central 4-point celestial compass star -->
+    <path
+        android:fillColor="#FFF8FAFF"
+        android:pathData="M48,20 C49.9,37.8 58.2,46.1 76,48 C58.2,49.9 49.9,58.2 48,76 C46.1,58.2 37.8,49.9 20,48 C37.8,46.1 46.1,37.8 48,20 Z" />
+
+    <!-- Accent star orb -->
+    <path
+        android:fillColor="#FFFBBF24"
+        android:pathData="M74,22 A2.6,2.6 0 1,1 73.99,22 Z" />
+</vector>

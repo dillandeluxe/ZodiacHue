@@ -5,9 +5,12 @@ import com.android.zodiachue.data.DailyHueSnapshot
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 
 object DailyHueEngine {
+    private val snapshotCache = ConcurrentHashMap<String, DailyHueSnapshot>()
+    private val forecastCache = ConcurrentHashMap<String, List<DailyHueSnapshot>>()
 
     private data class HuePreset(
         val name: String,
@@ -82,6 +85,9 @@ object DailyHueEngine {
     }
 
     fun getDailyHue(sign: String, dayOffset: Int = 0, baseEpochDay: Long = todayEpochDay()): DailyHueSnapshot {
+        val cacheKey = "${baseEpochDay}_${dayOffset}_${sign.trim().lowercase()}"
+        snapshotCache[cacheKey]?.let { return it }
+
         val zodiac = ZodiacProvider.getZodiacDataForSign(sign)
         val signIndex = ZodiacProvider.allZodiacData.indexOfFirst {
             it.sign.equals(zodiac.sign, ignoreCase = true)
@@ -126,7 +132,7 @@ object DailyHueEngine {
             ColorSwatch("Avoid", preset.avoidName, preset.avoidHex)
         )
 
-        return DailyHueSnapshot(
+        val snapshot = DailyHueSnapshot(
             sign = zodiac.sign,
             emoji = zodiac.emoji,
             dateRange = zodiac.dateRange,
@@ -151,11 +157,15 @@ object DailyHueEngine {
             mainImageRes = zodiac.mainImageRes,
             galleryImages = zodiac.galleryImages
         )
+        snapshotCache[cacheKey] = snapshot
+        return snapshot
     }
 
     fun getSevenDayForecast(sign: String, baseEpochDay: Long = todayEpochDay()): List<DailyHueSnapshot> {
+        val key = "${baseEpochDay}_${sign.trim().lowercase()}"
+        forecastCache[key]?.let { return it }
         return (0..6).map { offset ->
             getDailyHue(sign = sign, dayOffset = offset, baseEpochDay = baseEpochDay)
-        }
+        }.also { forecastCache[key] = it }
     }
 }

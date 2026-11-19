@@ -3,8 +3,8 @@ package com.android.zodiachue.ui.theme
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.LruCache
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -133,8 +134,8 @@ private val AMBIENT_STARS = listOf(
 )
 
 /**
- * Procedural atmospheric aurora-mesh backdrop with delicate orbital astrolabe arcs
- * and micro-stars that subtly tint to the active daily zodiac hue.
+ * Cached atmospheric aurora-mesh backdrop using drawWithCache so gradient shaders
+ * are allocated only when viewport size or accentColor changes.
  */
 @Composable
 fun CosmicBackdrop(
@@ -145,92 +146,75 @@ fun CosmicBackdrop(
         modifier = Modifier
             .fillMaxSize()
             .background(CosmicColors.VoidBg)
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
+            .drawWithCache {
+                val w = size.width
+                val h = size.height
 
-            // Base vertical deep space gradient
-            drawRect(
-                brush = Brush.verticalGradient(
+                val baseGradient = Brush.verticalGradient(
                     colors = listOf(
                         Color(0xFF06091A),
                         Color(0xFF0A0F28),
                         Color(0xFF050712)
                     )
                 )
-            )
 
-            // Top-right hue-reactive aurora glow
-            drawCircle(
-                brush = Brush.radialGradient(
+                val topCenter = Offset(w * 0.85f, h * 0.10f)
+                val topRadius = w * 0.95f
+                val topAurora = Brush.radialGradient(
                     colors = listOf(
-                        accentColor.copy(alpha = 0.24f),
-                        accentColor.copy(alpha = 0.08f),
+                        accentColor.copy(alpha = 0.22f),
+                        accentColor.copy(alpha = 0.07f),
                         Color.Transparent
                     ),
-                    center = Offset(w * 0.85f, h * 0.10f),
-                    radius = w * 0.95f
-                ),
-                radius = w * 0.95f,
-                center = Offset(w * 0.85f, h * 0.10f)
-            )
-
-            // Mid-left indigo-violet ambient nebula
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        Color(0xFF4C63E6).copy(alpha = 0.16f),
-                        Color(0xFF281E68).copy(alpha = 0.07f),
-                        Color.Transparent
-                    ),
-                    center = Offset(w * 0.10f, h * 0.48f),
-                    radius = w * 0.90f
-                ),
-                radius = w * 0.90f,
-                center = Offset(w * 0.10f, h * 0.48f)
-            )
-
-            // Lower-right subtle warm/cosmic glow
-            drawCircle(
-                brush = Brush.radialGradient(
-                    colors = listOf(
-                        accentColor.copy(alpha = 0.10f),
-                        Color.Transparent
-                    ),
-                    center = Offset(w * 0.78f, h * 0.86f),
-                    radius = w * 0.75f
-                ),
-                radius = w * 0.75f,
-                center = Offset(w * 0.78f, h * 0.86f)
-            )
-
-            // Subtle architectural astrolabe rings
-            val ringCenter = Offset(w * 0.84f, h * 0.14f)
-            drawCircle(
-                color = Color.White.copy(alpha = 0.035f),
-                radius = w * 0.42f,
-                center = ringCenter,
-                style = Stroke(width = 1.dp.toPx())
-            )
-            drawCircle(
-                color = Color.White.copy(alpha = 0.025f),
-                radius = w * 0.68f,
-                center = ringCenter,
-                style = Stroke(width = 1.dp.toPx())
-            )
-
-            // Crisp pinpoint starfield
-            AMBIENT_STARS.forEach { star ->
-                drawCircle(
-                    color = Color.White.copy(alpha = star.alpha),
-                    radius = star.radiusDp.dp.toPx(),
-                    center = Offset(w * star.xFrac, h * star.yFrac)
+                    center = topCenter,
+                    radius = topRadius
                 )
-            }
-        }
-        content()
-    }
+
+                val midCenter = Offset(w * 0.10f, h * 0.48f)
+                val midRadius = w * 0.90f
+                val midNebula = Brush.radialGradient(
+                    colors = listOf(
+                        Color(0xFF4C63E6).copy(alpha = 0.15f),
+                        Color(0xFF281E68).copy(alpha = 0.06f),
+                        Color.Transparent
+                    ),
+                    center = midCenter,
+                    radius = midRadius
+                )
+
+                val ringCenter = Offset(w * 0.84f, h * 0.14f)
+                val ringStroke = Stroke(width = 1.dp.toPx())
+                val starPoints = AMBIENT_STARS.map { star ->
+                    Triple(Offset(w * star.xFrac, h * star.yFrac), star.radiusDp.dp.toPx(), star.alpha)
+                }
+
+                onDrawBehind {
+                    drawRect(brush = baseGradient)
+                    drawCircle(brush = topAurora, radius = topRadius, center = topCenter)
+                    drawCircle(brush = midNebula, radius = midRadius, center = midCenter)
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.035f),
+                        radius = w * 0.42f,
+                        center = ringCenter,
+                        style = ringStroke
+                    )
+                    drawCircle(
+                        color = Color.White.copy(alpha = 0.025f),
+                        radius = w * 0.68f,
+                        center = ringCenter,
+                        style = ringStroke
+                    )
+                    starPoints.forEach { (offset, radius, alpha) ->
+                        drawCircle(
+                            color = Color.White.copy(alpha = alpha),
+                            radius = radius,
+                            center = offset
+                        )
+                    }
+                }
+            },
+        content = content
+    )
 }
 
 @Composable
@@ -243,14 +227,12 @@ fun CosmicCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val shape = RoundedCornerShape(cornerRadius)
-    val borderBrush = if (borderColor != null) {
-        Brush.verticalGradient(
-            listOf(borderColor, borderColor.copy(alpha = 0.28f))
-        )
-    } else {
-        Brush.verticalGradient(
-            listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.04f))
-        )
+    val borderBrush = remember(borderColor) {
+        if (borderColor != null) {
+            Brush.verticalGradient(listOf(borderColor, borderColor.copy(alpha = 0.28f)))
+        } else {
+            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.16f), Color.White.copy(alpha = 0.04f)))
+        }
     }
 
     val baseModifier = modifier
@@ -278,17 +260,17 @@ fun ColorSwatchChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val swatchColor = parseComposeColor(hex)
+    val swatchColor = remember(hex) { parseComposeColor(hex) }
+    val chipBorder = remember {
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.04f)))
+    }
     Surface(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
         color = CosmicColors.InputBg,
-        border = BorderStroke(
-            1.dp,
-            Brush.verticalGradient(listOf(Color.White.copy(alpha = 0.14f), Color.White.copy(alpha = 0.04f)))
-        )
+        border = BorderStroke(1.dp, chipBorder)
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
@@ -328,6 +310,44 @@ fun ColorSwatchChip(
             )
         }
     }
+}
+
+private val drawableBitmapCache = object : LruCache<String, ImageBitmap>(24) {}
+
+/**
+ * Decodes raster drawables asynchronously on Dispatchers.IO with downsampling & LRU cache
+ * so scrolling Lookbook/Moodboard/Developers never stutters on the main UI thread.
+ */
+@Composable
+fun rememberDrawableBitmap(resId: Int, maxDim: Int = 720): ImageBitmap? {
+    val context = LocalContext.current
+    val key = "${resId}_$maxDim"
+    var bitmap by remember(key) { mutableStateOf(drawableBitmapCache.get(key)) }
+
+    LaunchedEffect(key) {
+        if (bitmap == null) {
+            val loaded = withContext(Dispatchers.IO) {
+                try {
+                    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeResource(context.resources, resId, bounds)
+                    val largest = maxOf(bounds.outWidth, bounds.outHeight)
+                    var sample = 1
+                    while (largest / sample > maxDim) {
+                        sample *= 2
+                    }
+                    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+                    BitmapFactory.decodeResource(context.resources, resId, opts)?.asImageBitmap()
+                } catch (_: Exception) {
+                    null
+                }
+            }
+            if (loaded != null) {
+                drawableBitmapCache.put(key, loaded)
+                bitmap = loaded
+            }
+        }
+    }
+    return bitmap
 }
 
 @Composable
@@ -402,12 +422,23 @@ fun FullscreenLookDialog(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 val uriBitmap = rememberUriImageBitmap(uriString)
+                val drawableBitmap = drawableRes?.let { rememberDrawableBitmap(it, maxDim = 1280) }
                 Surface(
                     shape = RoundedCornerShape(24.dp),
                     color = CosmicColors.SurfaceSolid,
                     border = BorderStroke(1.dp, CosmicColors.Outline)
                 ) {
                     when {
+                        drawableBitmap != null -> {
+                            Image(
+                                bitmap = drawableBitmap,
+                                contentDescription = "Outfit Preview",
+                                contentScale = ContentScale.Fit,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(480.dp)
+                            )
+                        }
                         drawableRes != null -> {
                             Image(
                                 painter = painterResource(id = drawableRes),

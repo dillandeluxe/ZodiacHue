@@ -73,6 +73,7 @@ import com.android.zodiachue.ui.theme.CosmicCard
 import com.android.zodiachue.ui.theme.CosmicColors
 import com.android.zodiachue.ui.theme.FullscreenLookDialog
 import com.android.zodiachue.ui.theme.parseComposeColor
+import com.android.zodiachue.ui.theme.rememberDrawableBitmap
 import com.android.zodiachue.ui.theme.rememberUriImageBitmap
 
 private sealed interface MoodboardTile {
@@ -261,7 +262,10 @@ fun ProfileScreen(
         appState.savedOutfits.forEach { add(MoodboardTile.DrawableLook(it)) }
     }
 
-    CosmicBackdrop(accentColor = parseComposeColor(appState.activeDailyHue.primaryColorHex)) {
+    val activeAccent = remember(appState.activeDailyHue.primaryColorHex) {
+        parseComposeColor(appState.activeDailyHue.primaryColorHex)
+    }
+    CosmicBackdrop(accentColor = activeAccent) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
@@ -504,6 +508,7 @@ fun ProfileScreen(
                                 }
                             }
                             is MoodboardTile.DrawableLook -> {
+                                val lookBmp = rememberDrawableBitmap(tile.resId, maxDim = 640)
                                 Surface(
                                     modifier = Modifier
                                         .weight(1f)
@@ -515,12 +520,20 @@ fun ProfileScreen(
                                     border = BorderStroke(1.dp, CosmicColors.Outline)
                                 ) {
                                     Box(modifier = Modifier.fillMaxSize()) {
-                                        Image(
-                                            painter = painterResource(id = tile.resId),
-                                            contentDescription = "Saved Look",
-                                            contentScale = ContentScale.Crop,
-                                            modifier = Modifier.fillMaxSize()
-                                        )
+                                        if (lookBmp != null) {
+                                            Image(
+                                                bitmap = lookBmp,
+                                                contentDescription = "Saved Look",
+                                                contentScale = ContentScale.Crop,
+                                                modifier = Modifier.fillMaxSize()
+                                            )
+                                        } else {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize()
+                                                    .background(CosmicColors.SurfaceSolid)
+                                            )
+                                        }
                                         IconButton(
                                             onClick = {
                                                 appState.toggleSavedOutfit(tile.resId)

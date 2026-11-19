@@ -96,7 +96,10 @@ fun ExploreScreen(
         )
     }
 
-    CosmicBackdrop(accentColor = parseComposeColor(appState.activeDailyHue.primaryColorHex)) {
+    val activeAccent = remember(appState.activeDailyHue.primaryColorHex) {
+        parseComposeColor(appState.activeDailyHue.primaryColorHex)
+    }
+    CosmicBackdrop(accentColor = activeAccent) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
@@ -189,8 +192,10 @@ fun ExploreScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         row.forEach { data ->
-                            val todayHue = DailyHueEngine.getDailyHue(data.sign)
-                            val dotColor = parseComposeColor(todayHue.primaryColorHex)
+                            val todayHue = remember(data.sign) { DailyHueEngine.getDailyHue(data.sign) }
+                            val dotColor = remember(todayHue.primaryColorHex) {
+                                parseComposeColor(todayHue.primaryColorHex)
+                            }
                             val isMine = data.sign.equals(appState.userSign, ignoreCase = true)
 
                             CosmicCard(

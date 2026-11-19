@@ -77,7 +77,14 @@ fun OnboardingScreen(
     var startAuthInRegister by remember { mutableStateOf(false) }
 
     val activeHue = remember(selectedSign) { DailyHueEngine.getDailyHue(selectedSign) }
-    val accentColor = parseComposeColor(activeHue.primaryColorHex)
+    val accentColor = remember(activeHue.primaryColorHex) {
+        parseComposeColor(activeHue.primaryColorHex)
+    }
+    val signDotColors = remember {
+        ZodiacProvider.allZodiacData.associate { signData ->
+            signData.sign to parseComposeColor(DailyHueEngine.getDailyHue(signData.sign).primaryColorHex)
+        }
+    }
 
     if (showDatePicker) {
         CosmicDatePickerDialog(
@@ -114,9 +121,9 @@ fun OnboardingScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Image(
-                painter = painterResource(id = R.drawable.logo),
+                painter = painterResource(id = R.drawable.ic_zodiachue_logo),
                 contentDescription = "ZodiacHue",
-                modifier = Modifier.size(64.dp)
+                modifier = Modifier.size(74.dp)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -211,8 +218,7 @@ fun OnboardingScreen(
                     ) {
                         rowSigns.forEach { signData ->
                             val isSelected = signData.sign.equals(selectedSign, ignoreCase = true)
-                            val signHue = DailyHueEngine.getDailyHue(signData.sign)
-                            val dotColor = parseComposeColor(signHue.primaryColorHex)
+                            val dotColor = signDotColors[signData.sign] ?: accentColor
 
                             Surface(
                                 modifier = Modifier

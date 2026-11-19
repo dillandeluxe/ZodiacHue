@@ -3,6 +3,7 @@ package com.android.zodiachue.ui.state
 import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,17 +58,21 @@ class ZodiacHueAppState(context: Context) {
     val isPreviewingOtherSign: Boolean
         get() = previewSign != null && !previewSign.equals(userSign, ignoreCase = true)
 
-    val activeDailyHue: DailyHueSnapshot
-        get() = DailyHueEngine.getDailyHue(activeSign, dayOffset = selectedDayOffset)
+    val activeDailyHue: DailyHueSnapshot by derivedStateOf {
+        DailyHueEngine.getDailyHue(activeSign, dayOffset = selectedDayOffset)
+    }
 
-    val sevenDayForecast: List<DailyHueSnapshot>
-        get() = DailyHueEngine.getSevenDayForecast(activeSign)
+    val sevenDayForecast: List<DailyHueSnapshot> by derivedStateOf {
+        DailyHueEngine.getSevenDayForecast(activeSign)
+    }
 
-    val streakDays: Int
-        get() = DiaryRepository.calculateStreakDays(diaryEntries)
+    val streakDays: Int by derivedStateOf {
+        DiaryRepository.calculateStreakDays(diaryEntries)
+    }
 
-    val reflectedToday: Boolean
-        get() = DiaryRepository.hasEntryToday(diaryEntries)
+    val reflectedToday: Boolean by derivedStateOf {
+        DiaryRepository.hasEntryToday(diaryEntries)
+    }
 
     init {
         restoreSession()

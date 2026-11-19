@@ -19,12 +19,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Bolt
@@ -53,7 +52,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,6 +66,7 @@ import com.android.zodiachue.ui.theme.CosmicCard
 import com.android.zodiachue.ui.theme.CosmicColors
 import com.android.zodiachue.ui.theme.FullscreenLookDialog
 import com.android.zodiachue.ui.theme.parseComposeColor
+import com.android.zodiachue.ui.theme.rememberDrawableBitmap
 import java.util.Calendar
 
 @Composable
@@ -80,8 +79,11 @@ fun TodayScreen(
     val hue = appState.activeDailyHue
     val zodiac = remember(hue.sign) { ZodiacProvider.getZodiacDataForSign(hue.sign) }
     val forecast = appState.sevenDayForecast
+    val staticHueColor = remember(hue.primaryColorHex) {
+        parseComposeColor(hue.primaryColorHex)
+    }
     val animatedHueColor by animateColorAsState(
-        targetValue = parseComposeColor(hue.primaryColorHex),
+        targetValue = staticHueColor,
         label = "hueColor"
     )
 
@@ -111,14 +113,13 @@ fun TodayScreen(
         )
     }
 
-    CosmicBackdrop(accentColor = animatedHueColor) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 14.dp),
+    CosmicBackdrop(accentColor = staticHueColor) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            item(key = "header") {
             // Top Greeting & Sign Switcher Row
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -176,8 +177,10 @@ fun TodayScreen(
                     }
                 }
             }
+            }
 
             if (appState.isPreviewingOtherSign) {
+                item(key = "preview_banner") {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -206,16 +209,20 @@ fun TodayScreen(
                         )
                     }
                 }
+                }
             }
 
+            item(key = "forecast_strip") {
             // 7-Day Hue Forecast Strip
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(vertical = 2.dp)
             ) {
-                items(forecast) { dayItem ->
+                items(forecast, key = { it.dayOffset }) { dayItem ->
                     val isSelected = dayItem.dayOffset == appState.selectedDayOffset
-                    val dotColor = parseComposeColor(dayItem.primaryColorHex)
+                    val dotColor = remember(dayItem.primaryColorHex) {
+                        parseComposeColor(dayItem.primaryColorHex)
+                    }
                     Surface(
                         modifier = Modifier
                             .clip(RoundedCornerShape(14.dp))
@@ -248,7 +255,9 @@ fun TodayScreen(
                     }
                 }
             }
+            }
 
+            item(key = "hero_card") {
             // Hero Daily Hue Aura Card
             Surface(
                 shape = RoundedCornerShape(26.dp),
@@ -401,7 +410,9 @@ fun TodayScreen(
                     }
                 }
             }
+            }
 
+            item(key = "harmony_card") {
             // Harmony Palette Card
             CosmicCard {
                 Text(
@@ -431,7 +442,9 @@ fun TodayScreen(
                     }
                 }
             }
+            }
 
+            item(key = "vibe_meters") {
             // Cosmic Vibe Meters Card
             CosmicCard {
                 Row(
@@ -488,7 +501,9 @@ fun TodayScreen(
                     }
                 }
             }
+            }
 
+            item(key = "celestial_profile") {
             // Native Dark-Glass Celestial Profile Card (replaces dated bright Canva PNGs)
             CosmicCard(borderColor = animatedHueColor.copy(alpha = 0.35f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -536,7 +551,9 @@ fun TodayScreen(
                     lineHeight = 19.sp
                 )
             }
+            }
 
+            item(key = "reading_guidance") {
             // Reading & Style Guidance
             CosmicCard {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -592,26 +609,33 @@ fun TodayScreen(
                     )
                 }
             }
+            }
 
+            item(key = "lookbook_header") {
             // Curated Outfit Lookbook
-            Text(
-                text = "Outfit Lookbook",
-                color = CosmicColors.TextPrimary,
-                fontSize = 17.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Tap any look to preview fullscreen or save to your moodboard",
-                color = CosmicColors.TextSecondary,
-                fontSize = 12.sp
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Outfit Lookbook",
+                    color = CosmicColors.TextPrimary,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Tap any look to preview fullscreen or save to your moodboard",
+                    color = CosmicColors.TextSecondary,
+                    fontSize = 12.sp
+                )
+            }
+            }
 
+            item(key = "lookbook_cards") {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 hue.galleryImages.forEachIndexed { idx, resId ->
                     val isSaved = appState.savedOutfits.contains(resId)
+                    val lookBitmap = rememberDrawableBitmap(resId, maxDim = 720)
                     Surface(
                         modifier = Modifier
                             .weight(1f)
@@ -623,12 +647,20 @@ fun TodayScreen(
                         border = BorderStroke(1.dp, CosmicColors.Outline)
                     ) {
                         Box(modifier = Modifier.fillMaxSize()) {
-                            Image(
-                                painter = painterResource(id = resId),
-                                contentDescription = "Outfit Look ${idx + 1}",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            if (lookBitmap != null) {
+                                Image(
+                                    bitmap = lookBitmap,
+                                    contentDescription = "Outfit Look ${idx + 1}",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(CosmicColors.SurfaceSolid)
+                                )
+                            }
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -691,8 +723,11 @@ fun TodayScreen(
                     }
                 }
             }
+            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            item(key = "bottom_spacer") {
+                Spacer(modifier = Modifier.height(12.dp))
+            }
         }
     }
 }
